@@ -12,6 +12,7 @@ import org.json.JSONObject
 import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.concurrent.thread
 
 /**
@@ -21,9 +22,11 @@ import kotlin.concurrent.thread
  */
 class UpdateBridge(private val act: MainActivity, private val web: WebView) {
 
-    private var apkUrl: String? = null
-    private var apkSize = 0L
-    private var version = ""
+    @Volatile private var apkUrl: String? = null
+    @Volatile private var apkSize = 0L
+    @Volatile private var version = ""
+    // Evita búsquedas o descargas en paralelo si se toca dos veces
+    private val busy = AtomicBoolean(false)
 
     private fun emit(o: JSONObject) = web.post { web.evaluateJavascript("window.onUpd&&onUpd($o)", null) }
     private fun state(st: String) = JSONObject().put("st", st)
@@ -33,14 +36,21 @@ class UpdateBridge(private val act: MainActivity, private val web: WebView) {
 
     @JavascriptInterface
     fun check() {
+        if (!busy.compareAndSet(false, true)) return
         thread {
+            var c: HttpURLConnection? = null
             try {
-                val c = URL("https://api.github.com/repos/${BuildConfig.UPDATE_REPO}/releases/latest")
+                c = URL("https://api.github.com/repos/${BuildConfig.UPDATE_REPO}/releases/latest")
                     .openConnection() as HttpURLConnection
                 c.setRequestProperty("Accept", "application/vnd.github+json")
+                c.setRequestProperty("User-Agent", "IgnisStudio/${BuildConfig.VERSION_NAME}")
                 c.connectTimeout = 10_000; c.readTimeout = 15_000
-                if (c.responseCode == 404) { emit(state("ok")); return@thread }
-                if (c.responseCode != 200) throw Exception("GitHub respondió ${c.responseCode}")
+                val code0 = c.responseCode
+                if (code0 == 404) { emit(state("ok")); return@thread }
+                if (code0 == 403 || code0 == 429) {
+                    emit(state("err").put("msg", "GitHub limitó las consultas por un rato. Inténtalo más tarde.")); return@thread
+                }
+                if (code0 != 200) throw Exception("GitHub respondió $code0")
                 val j = JSONObject(c.inputStream.bufferedReader().use { it.readText() })
                 val tag = j.optString("tag_name")
                 val code = tag.substringAfterLast('.').filter { it.isDigit() }.toIntOrNull() ?: 0
@@ -55,6 +65,9 @@ class UpdateBridge(private val act: MainActivity, private val web: WebView) {
                 } else emit(state("ok"))
             } catch (e: Exception) {
                 emit(state("err").put("msg", "No se pudo conectar con GitHub. Revisa tu conexión."))
+            } finally {
+                c?.disconnect()
+                busy.set(false)
             }
         }
     }
@@ -65,12 +78,16 @@ class UpdateBridge(private val act: MainActivity, private val web: WebView) {
         if (Build.VERSION.SDK_INT >= 26 && !act.packageManager.canRequestPackageInstalls()) {
             emit(state("perm")); return
         }
+        if (!busy.compareAndSet(false, true)) return
         thread {
+            val f = File(act.cacheDir, "update.apk")
+            var c: HttpURLConnection? = null
             try {
-                val f = File(act.cacheDir, "update.apk")
-                val c = URL(url).openConnection() as HttpURLConnection
+                c = URL(url).openConnection() as HttpURLConnection
                 c.instanceFollowRedirects = true
+                c.setRequestProperty("User-Agent", "IgnisStudio/${BuildConfig.VERSION_NAME}")
                 c.connectTimeout = 15_000; c.readTimeout = 30_000
+                if (c.responseCode != 200) throw Exception("Descarga respondió ${c.responseCode}")
                 val total = c.contentLengthLong.takeIf { it > 0 } ?: apkSize
                 var got = 0L; var last = -1
                 c.inputStream.use { inp ->
@@ -84,9 +101,15 @@ class UpdateBridge(private val act: MainActivity, private val web: WebView) {
                         }
                     }
                 }
+                // Una descarga cortada no debe llegar al instalador
+                if (total > 0 && got != total) throw Exception("Descarga incompleta: $got de $total")
                 install(f)
             } catch (e: Exception) {
                 emit(state("err").put("msg", "La descarga se interrumpió. Inténtalo de nuevo."))
+            } finally {
+                c?.disconnect()
+                f.delete()
+                busy.set(false)
             }
         }
     }
@@ -114,12 +137,15 @@ class UpdateBridge(private val act: MainActivity, private val web: WebView) {
     }
 
     /** Resultado del instalador (lo recibe MainActivity). */
+    @Suppress("DEPRECATION")
     fun onStatus(i: Intent) {
         when (i.getIntExtra(PackageInstaller.EXTRA_STATUS, PackageInstaller.STATUS_FAILURE)) {
             PackageInstaller.STATUS_PENDING_USER_ACTION -> {
-                @Suppress("DEPRECATION")
-                val confirm = i.getParcelableExtra<Intent>(Intent.EXTRA_INTENT)
-                if (confirm != null) act.startActivity(confirm)
+                val confirm = if (Build.VERSION.SDK_INT >= 33) i.getParcelableExtra(Intent.EXTRA_INTENT, Intent::class.java)
+                else i.getParcelableExtra<Intent>(Intent.EXTRA_INTENT)
+                if (confirm != null) try { act.startActivity(confirm) } catch (e: Exception) {
+                    emit(state("err").put("msg", "Android no pudo mostrar el aviso de instalación."))
+                }
             }
             PackageInstaller.STATUS_SUCCESS -> emit(state("ok"))
             PackageInstaller.STATUS_FAILURE_ABORTED -> emit(state("new").put("v", version).put("size", apkSize))

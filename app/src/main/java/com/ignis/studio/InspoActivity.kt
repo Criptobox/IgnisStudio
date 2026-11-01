@@ -2,18 +2,21 @@ package com.ignis.studio
 
 import android.annotation.SuppressLint
 import android.app.Activity
+import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
+import android.net.Uri
 import android.os.Bundle
 import android.text.TextUtils
 import android.view.Gravity
 import android.view.ViewGroup.LayoutParams.MATCH_PARENT
 import android.view.ViewGroup.LayoutParams.WRAP_CONTENT
 import android.webkit.WebChromeClient
+import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.LinearLayout
@@ -34,7 +37,7 @@ class InspoActivity : AppCompatActivity() {
 
     private lateinit var web: WebView
     private lateinit var titleView: TextView
-    private val results = JSONArray()
+    private var results = JSONArray()
 
     private fun dp(v: Int) = (v * resources.displayMetrics.density).toInt()
 
@@ -78,7 +81,15 @@ class InspoActivity : AppCompatActivity() {
             settings.domStorageEnabled = true
             settings.loadWithOverviewMode = true
             settings.useWideViewPort = true
-            webViewClient = WebViewClient()
+            webViewClient = object : WebViewClient() {
+                // Los enlaces que no son web (intent:, mailto:, apps de Pinterest…) se pasan a Android
+                override fun shouldOverrideUrlLoading(v: WebView, r: WebResourceRequest): Boolean {
+                    val s = r.url.scheme?.lowercase()
+                    if (s == "http" || s == "https") return false
+                    openExternal(r.url.toString())
+                    return true
+                }
+            }
             webChromeClient = object : WebChromeClient() {
                 override fun onProgressChanged(v: WebView, p: Int) { progress.progress = p; progress.alpha = if (p < 100) 1f else 0f }
                 override fun onReceivedTitle(v: WebView, t: String?) { if (!t.isNullOrBlank()) titleView.text = t }
@@ -93,28 +104,54 @@ class InspoActivity : AppCompatActivity() {
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() { if (web.canGoBack()) web.goBack() else finishWithResults() }
         })
-        if (savedInstanceState == null) web.loadUrl(startUrl) else web.restoreState(savedInstanceState)
+        if (savedInstanceState == null) web.loadUrl(startUrl)
+        else {
+            // Lo guardado antes de que Android recreara la pantalla no se pierde
+            savedInstanceState.getString(KEY_RESULTS)?.let { results = try { JSONArray(it) } catch (e: Exception) { JSONArray() } }
+            if (web.restoreState(savedInstanceState) == null) web.loadUrl(startUrl)
+        }
+    }
+
+    private fun openExternal(url: String) {
+        try {
+            val i = if (url.startsWith("intent:")) {
+                Intent.parseUri(url, Intent.URI_INTENT_SCHEME).apply {
+                    addCategory(Intent.CATEGORY_BROWSABLE); component = null; selector = null
+                }
+            } else Intent(Intent.ACTION_VIEW, Uri.parse(url))
+            try { startActivity(i) } catch (e: ActivityNotFoundException) {
+                // Si la app no está instalada, muchas páginas dan una dirección web de respaldo
+                i.getStringExtra("browser_fallback_url")?.takeIf { it.startsWith("http") }?.let { web.loadUrl(it) }
+            }
+        } catch (e: Exception) { /* enlace mal formado: se ignora */ }
     }
 
     /** Captura lo visible, la reduce y la guarda en files/refs para que la Biblioteca la muestre. */
     private fun capture() {
         if (web.width == 0 || web.height == 0) return
-        val full = Bitmap.createBitmap(web.width, web.height, Bitmap.Config.ARGB_8888)
-        web.draw(Canvas(full))
-        val w = 540; val h = (full.height * w.toFloat() / full.width).toInt()
-        val small = Bitmap.createScaledBitmap(full, w, h, true)
         val id = System.currentTimeMillis().toString()
-        val dir = File(filesDir, "refs").apply { mkdirs() }
-        File(dir, "ref_$id.jpg").outputStream().use { small.compress(Bitmap.CompressFormat.JPEG, 82, it) }
-        full.recycle(); small.recycle()
-        results.put(JSONObject().put("t", "ref").put("id", id).put("n", web.title ?: titleView.text.toString()).put("u", web.url).put("img", "/refs/ref_$id.jpg"))
+        try {
+            // Se dibuja directamente a 540 px de ancho: menos memoria que capturar a tamaño completo y reducir
+            val w = minOf(540, web.width); val z = w.toFloat() / web.width
+            val h = (web.height * z).toInt().coerceAtLeast(1)
+            val bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+            Canvas(bmp).apply { scale(z, z) }.also { web.draw(it) }
+            val dir = File(filesDir, "refs").apply { mkdirs() }
+            File(dir, "ref_$id.jpg").outputStream().use { bmp.compress(Bitmap.CompressFormat.JPEG, 82, it) }
+            bmp.recycle()
+        } catch (e: Throwable) {
+            Toast.makeText(this, "No se pudo guardar la captura", Toast.LENGTH_SHORT).show(); return
+        }
+        val name = web.title?.takeIf { it.isNotBlank() } ?: titleView.text.toString()
+        results.put(JSONObject().put("t", "ref").put("id", id).put("n", name.take(60)).put("u", web.url ?: "").put("img", "/refs/ref_$id.jpg"))
         web.performHapticFeedback(android.view.HapticFeedbackConstants.CONTEXT_CLICK)
         Toast.makeText(this, "Guardado en Biblioteca", Toast.LENGTH_SHORT).show()
     }
 
     private fun pinPage() {
         val u = web.url ?: return
-        results.put(JSONObject().put("t", "pin").put("n", (web.title ?: u).take(40)).put("u", u))
+        val name = web.title?.takeIf { it.isNotBlank() } ?: Uri.parse(u).host ?: u
+        results.put(JSONObject().put("t", "pin").put("n", name.take(40)).put("u", u))
         Toast.makeText(this, "Página anclada", Toast.LENGTH_SHORT).show()
     }
 
@@ -123,5 +160,17 @@ class InspoActivity : AppCompatActivity() {
         finish()
     }
 
-    override fun onSaveInstanceState(outState: Bundle) { super.onSaveInstanceState(outState); web.saveState(outState) }
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        web.saveState(outState)
+        outState.putString(KEY_RESULTS, results.toString())
+    }
+
+    override fun onDestroy() {
+        web.stopLoading()
+        web.destroy()
+        super.onDestroy()
+    }
+
+    private companion object { const val KEY_RESULTS = "results" }
 }

@@ -2,6 +2,7 @@ package com.ignis.studio
 
 import android.annotation.SuppressLint
 import android.app.Activity
+import android.content.ActivityNotFoundException
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -14,13 +15,13 @@ import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.webkit.WebViewAssetLoader
-import org.json.JSONObject
 import java.io.File
 
 class MainActivity : AppCompatActivity() {
@@ -48,8 +49,19 @@ class MainActivity : AppCompatActivity() {
         override fun onReceive(c: Context, i: Intent) = updater.onStatus(i)
     }
 
-    fun openInspo(url: String, name: String) =
+    fun openInspo(url: String, name: String) {
+        val u = Uri.parse(url)
+        if (u.scheme?.lowercase() !in setOf("http", "https")) return
         inspo.launch(Intent(this, InspoActivity::class.java).putExtra("u", url).putExtra("n", name))
+    }
+
+    private fun openExternal(u: Uri) {
+        try {
+            startActivity(Intent(Intent.ACTION_VIEW, u).addCategory(Intent.CATEGORY_BROWSABLE))
+        } catch (e: ActivityNotFoundException) {
+            Toast.makeText(this, "No hay ninguna app para abrir este enlace", Toast.LENGTH_SHORT).show()
+        }
+    }
 
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -77,8 +89,13 @@ class MainActivity : AppCompatActivity() {
                     loader.shouldInterceptRequest(r.url)
                 // Cualquier enlace externo se abre en el visor, sin salir de la app
                 override fun shouldOverrideUrlLoading(v: WebView, r: WebResourceRequest): Boolean {
-                    if (r.url.host == "appassets.androidplatform.net") return false
-                    openInspo(r.url.toString(), r.url.host ?: ""); return true
+                    val u = r.url
+                    if (u.host == "appassets.androidplatform.net") return false
+                    when (u.scheme?.lowercase()) {
+                        "http", "https" -> openInspo(u.toString(), u.host ?: "")
+                        else -> openExternal(u) // mailto:, tel:, intent:… van a la app que corresponda
+                    }
+                    return true
                 }
                 override fun onPageFinished(v: WebView, url: String) { ready = true }
             }
@@ -124,6 +141,10 @@ class MainActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         unregisterReceiver(installStatus)
+        if (::web.isInitialized) {
+            web.removeAllViews()
+            web.destroy()
+        }
         super.onDestroy()
     }
 

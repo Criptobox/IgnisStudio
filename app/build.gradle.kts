@@ -4,8 +4,8 @@ plugins {
 }
 
 // Versión: en GitHub Actions es el número de compilación, así cada actualización es mayor que la anterior
-val buildNumber = (System.getenv("VERSION_CODE") ?: "1").toInt()
-val updateRepo = System.getenv("UPDATE_REPO") ?: "Criptobox/ignis-studio"
+val buildNumber = System.getenv("VERSION_CODE")?.toIntOrNull() ?: 1
+val updateRepo = System.getenv("UPDATE_REPO") ?: "Criptobox/IgnisStudio"
 val keystorePath: String? = System.getenv("KEYSTORE_FILE")
 
 android {
