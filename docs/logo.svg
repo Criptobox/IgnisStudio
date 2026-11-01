@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs>
+    <radialGradient id="bg" cx="0.5" cy="0.42" r="0.75"><stop offset="0" stop-color="#2c1f78"/><stop offset="0.55" stop-color="#120f3a"/><stop offset="1" stop-color="#07061a"/></radialGradient>
+    <radialGradient id="gl" cx="0.5" cy="0.55" r="0.5"><stop offset="0" stop-color="#ff6a3d" stop-opacity=".45"/><stop offset="1" stop-color="#ff6a3d" stop-opacity="0"/></radialGradient>
+  </defs>
+  <rect width="1024" height="1024" fill="url(#bg)"/>
+  <circle cx="512" cy="540" r="440" fill="url(#gl)"/>
+  <image href="logo-flame.svg" x="40" y="30" width="944" height="944"/>
+</svg>
