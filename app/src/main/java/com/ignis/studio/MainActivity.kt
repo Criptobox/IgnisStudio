@@ -30,6 +30,7 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var web: WebView
     private lateinit var updater: UpdateBridge
+    private lateinit var llm: LlmBridge
     private var fileCallback: ValueCallback<Array<Uri>>? = null
     private var ready = false
 
@@ -38,6 +39,11 @@ class MainActivity : AppCompatActivity() {
         fileCallback?.onReceiveValue(if (uri != null) arrayOf(uri) else null)
         fileCallback = null
     }
+
+    // Importar un modelo .gguf del teléfono (no tiene un tipo MIME propio: se aceptan todos)
+    private val pickGguf = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri -> llm.onPicked(uri) }
+
+    fun pickModel() = try { pickGguf.launch(arrayOf("*/*")) } catch (e: ActivityNotFoundException) { llm.onPicked(null) }
 
     // Lo que se guardó o ancló en el visor de inspiración vuelve a la Biblioteca (y al cerebro)
     private val inspo = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { r ->
@@ -93,6 +99,9 @@ class MainActivity : AppCompatActivity() {
                     when {
                         r.url.host == APP_HOST -> loader.shouldInterceptRequest(r.url)
                         r.url.scheme == "data" || r.url.scheme == "blob" -> null // logos incrustados y subidos
+                        // Tipografías de Google para la vista previa de los diseños (solo CSS y fuentes, sin scripts)
+                        r.method == "GET" && r.url.scheme == "https" &&
+                            (r.url.host == "fonts.googleapis.com" || r.url.host == "fonts.gstatic.com") -> null
                         else -> WebResourceResponse("text/plain", "utf-8", 403, "Bloqueado", emptyMap(), ByteArrayInputStream(ByteArray(0)))
                     }
                 // Cualquier enlace externo se abre en el visor, sin salir de la app
@@ -124,6 +133,8 @@ class MainActivity : AppCompatActivity() {
         web.addJavascriptInterface(HapticBridge(web), "IgnisHaptic")
         web.addJavascriptInterface(updater, "IgnisUpdate")
         web.addJavascriptInterface(WebBridge(this), "IgnisWeb")
+        llm = LlmBridge(this, web)
+        web.addJavascriptInterface(llm, "IgnisLLM")
         setContentView(web)
 
         ContextCompat.registerReceiver(
@@ -149,6 +160,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         unregisterReceiver(installStatus)
+        if (isFinishing && ::llm.isInitialized) llm.release()
         if (::web.isInitialized) {
             web.removeAllViews()
             web.destroy()

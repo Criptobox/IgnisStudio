@@ -20,7 +20,23 @@ android {
         versionName = "1.0.$buildNumber"
         // Repositorio donde la app busca sus actualizaciones (GitHub Releases)
         buildConfigField("String", "UPDATE_REPO", "\"$updateRepo\"")
+
+        // Motor local (llama.cpp): solo teléfonos de 64 bits ARM, que son los que pueden mover un modelo
+        ndk { abiFilters += listOf("arm64-v8a") }
+        externalNativeBuild {
+            cmake {
+                arguments += listOf("-DCMAKE_BUILD_TYPE=Release", "-DANDROID_STL=c++_shared")
+                cppFlags += listOf("-O3")
+            }
+        }
     }
+
+    externalNativeBuild {
+        cmake { path = file("src/main/cpp/CMakeLists.txt") }
+    }
+
+    // Las variantes del motor (libggml-cpu-*.so) se buscan en la carpeta de bibliotecas: hay que extraerlas
+    packaging { jniLibs { useLegacyPackaging = true } }
 
     buildFeatures { buildConfig = true }
 

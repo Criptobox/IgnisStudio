@@ -19,7 +19,7 @@ La app usa exactamente el HTML, CSS y JS del diseño original (`app/src/main/ass
 - Generar APK con los 5 pasos animados.
 - “Toca un logo para ponerle el oficial”: abre la galería del teléfono y guarda el logo (localStorage).
 
-> Las acciones que en el diseño son simuladas (descarga de modelos, respuesta del agente, exportar ZIP, compilar APK) siguen siendo simuladas: no se añadió lógica que el diseño no tenía.
+> En la APK, los modelos y el chat son **reales** (ver *Modelos locales*). Compilar APK sigue siendo una animación de demostración. En el navegador todo funciona en modo demostración.
 
 ## Ignis, el avatar del agente
 Personaje llama que cambia según lo que hace el agente:
@@ -64,6 +64,18 @@ Seguridad: cada versión se publica con su huella SHA-256 (`IgnisStudio-1.0.N.ap
 - **Mantén pulsado Crear** para un menú rápido: Diseño Web, App Android, UI/UX o plantillas.
 - **Pantalla de bienvenida** con la llama del logo (SplashScreen de Android 12+, compatible desde Android 8).
 
+## Modelos locales (llama.cpp)
+La APK lleva [llama.cpp](https://github.com/ggml-org/llama.cpp) (versión fija `b12000`) compilado para ARM de 64 bits. Todo se ejecuta en el teléfono, sin internet ni cuentas.
+
+- **Descargar**: en *Modelos*, toca ↓ en un modelo del catálogo (GGUF Q4_K_M de Hugging Face). La descarga se puede pausar (✕) y continúa donde quedó; la pantalla se mantiene encendida mientras tanto.
+- **Importar .gguf**: usa cualquier modelo GGUF que ya tengas en el teléfono.
+- **Usar**: toca ▶. El modelo se carga en memoria al escribir en el Chat (o al tocar ▶ otra vez) y la respuesta aparece en directo; *Detener* la corta.
+- **Borrar**: toca ⋮ dos veces.
+- **Resultado**: cuando Ignis entrega un diseño, el HTML se ve en *Resultado ▸ Vista* (sin scripts, aislado), *Código* lo muestra entero, *Copiar código* lo copia y *Pantalla completa* lo abre a todo el ancho.
+
+Catálogo: Qwen3 1.7B / 4B / 8B, Qwen2.5 Coder 3B, Gemma 3 1B / 4B y Llama 3.2 3B. Con 6–8 GB de RAM, los de 1–4B son los recomendados.
+El motor elige al arrancar la versión más rápida para el procesador del teléfono (ARMv8.0, 8.2 con dotprod, 8.6 con i8mm…).
+
 ## Compatibilidad de modelos
 La app lee el teléfono real (RAM total y libre, espacio libre, chip, núcleos y arquitectura) y marca cada modelo:
 
@@ -88,7 +100,7 @@ Memoria del proyecto que no depende del modelo: guarda tus pedidos, los cambios 
 3. La APK queda en **Releases** como `IgnisStudio-1.0.N.apk`. Instálala una vez; las siguientes llegan desde la propia app.
 
 ### En tu PC
-Abre la carpeta en Android Studio (Hedgehog o superior) y pulsa *Build ▸ Build APK(s)*, o desde la terminal con JDK 17 (el Gradle Wrapper descarga Gradle 8.9 solo):
+Abre la carpeta en Android Studio (Hedgehog o superior) y pulsa *Build ▸ Build APK(s)*, o desde la terminal con JDK 17 (el Gradle Wrapper descarga Gradle 8.9 solo). Hace falta el NDK y CMake del SDK de Android y conexión a internet la primera vez (descarga llama.cpp):
 
 ```bash
 ./gradlew assembleDebug
@@ -104,6 +116,10 @@ app/src/main/assets/js/app.js       # Pantallas, chat, cerebro, biblioteca y act
 app/src/main/assets/js/app-mode.js  # Modo app: navegación, gestos y bienvenida
 app/src/main/assets/js/logos.js     # Logos oficiales por defecto (imágenes incrustadas)
 app/src/main/assets/img/splash.svg  # Llama de la bienvenida en el navegador
+app/src/main/assets/js/llm.js       # Modelos locales y chat en directo (usa window.IgnisLLM)
+app/src/main/cpp/                   # llama.cpp (se descarga al compilar) + puente JNI ignis_llm.cpp
+app/src/main/java/com/ignis/studio/LlmBridge.kt      # Descarga, importa, carga y genera con los modelos
+app/src/main/java/com/ignis/studio/LlamaNative.kt    # Enlace con la biblioteca nativa
 app/src/main/java/com/ignis/studio/MainActivity.kt   # WebView, selector de imágenes, botón atrás
 app/src/main/java/com/ignis/studio/DeviceBridge.kt   # Lee RAM, espacio, chip y arquitectura
 app/src/main/java/com/ignis/studio/BrainBridge.kt    # Guarda el cerebro en cerebro.json y limpia capturas huérfanas
