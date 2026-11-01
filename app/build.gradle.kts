@@ -45,9 +45,11 @@ android {
         create("ignis") {
             if (keystorePath != null) {
                 storeFile = file(keystorePath)
-                storePassword = System.getenv("KEYSTORE_PASSWORD")
-                keyAlias = System.getenv("KEY_ALIAS")
-                keyPassword = System.getenv("KEY_PASSWORD")
+                val storePw = System.getenv("KEYSTORE_PASSWORD")
+                storePassword = storePw
+                // Si faltan, alias "ignis" y la misma contraseña del almacén (en PKCS12 son iguales)
+                keyAlias = System.getenv("KEY_ALIAS")?.trim()?.takeIf { it.isNotEmpty() } ?: "ignis"
+                keyPassword = System.getenv("KEY_PASSWORD")?.takeIf { it.isNotEmpty() } ?: storePw
             }
         }
     }

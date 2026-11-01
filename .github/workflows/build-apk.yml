@@ -39,9 +39,20 @@ jobs:
       - name: Preparar la firma
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
         run: |
           if [ -n "$KEYSTORE_BASE64" ]; then
-            echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/ignis.jks"
+            # tolera espacios o saltos de línea al pegar el secreto
+            echo "$KEYSTORE_BASE64" | tr -d ' \r\n' | base64 -d > "$RUNNER_TEMP/ignis.jks" \
+              || { echo "::error::KEYSTORE_BASE64 no es un base64 válido. Vuelve a pegar el contenido de KEYSTORE_BASE64.txt."; exit 1; }
+            [ -n "$KEYSTORE_PASSWORD" ] || { echo "::error::Falta el secreto KEYSTORE_PASSWORD."; exit 1; }
+            ALIAS="${KEY_ALIAS:-ignis}"
+            keytool -list -keystore "$RUNNER_TEMP/ignis.jks" -storepass "$KEYSTORE_PASSWORD" > "$RUNNER_TEMP/ks.txt" 2>&1 \
+              || { echo "::error::La contraseña KEYSTORE_PASSWORD no abre la clave. Revisa que esté copiada sin espacios."; exit 1; }
+            grep -qi "^$ALIAS," "$RUNNER_TEMP/ks.txt" \
+              || { echo "::error::La clave no tiene el alias '$ALIAS'. KEY_ALIAS debe ser: $(grep -i PrivateKeyEntry "$RUNNER_TEMP/ks.txt" | cut -d, -f1)"; exit 1; }
+            echo "Firma correcta: alias '$ALIAS', $(grep -i 'SHA-256' "$RUNNER_TEMP/ks.txt" || true)"
             echo "KEYSTORE_FILE=$RUNNER_TEMP/ignis.jks" >> "$GITHUB_ENV"
           else
             echo "::warning::Falta el secreto KEYSTORE_BASE64. La APK se firmará con una clave temporal y no podrá actualizarse desde la app."
