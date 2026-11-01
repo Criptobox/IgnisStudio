@@ -32,7 +32,7 @@ class LlmBridge(private val act: MainActivity, private val web: WebView) {
     @Volatile private var initDone = false
     private val keepOn = java.util.concurrent.atomic.AtomicInteger(0)
 
-    private fun emit(o: JSONObject) = web.post { web.evaluateJavascript("window.onLlm&&onLlm($o)", null) }
+    private fun emit(o: JSONObject) { web.post { web.evaluateJavascript("window.onLlm&&onLlm($o)", null) } }
     private fun ev(st: String) = JSONObject().put("st", st)
 
     /** Mantiene la pantalla encendida mientras descarga o piensa (si se apaga, Android puede cortar el trabajo). */
