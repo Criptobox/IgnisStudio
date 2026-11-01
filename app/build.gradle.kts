@@ -3,6 +3,11 @@ plugins {
     id("org.jetbrains.kotlin.android")
 }
 
+// Versión: en GitHub Actions es el número de compilación, así cada actualización es mayor que la anterior
+val buildNumber = (System.getenv("VERSION_CODE") ?: "1").toInt()
+val updateRepo = System.getenv("UPDATE_REPO") ?: "Criptobox/ignis-studio"
+val keystorePath: String? = System.getenv("KEYSTORE_FILE")
+
 android {
     namespace = "com.ignis.studio"
     compileSdk = 34
@@ -11,15 +16,31 @@ android {
         applicationId = "com.ignis.studio"
         minSdk = 26
         targetSdk = 34
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = buildNumber
+        versionName = "1.0.$buildNumber"
+        // Repositorio donde la app busca sus actualizaciones (GitHub Releases)
+        buildConfigField("String", "UPDATE_REPO", "\"$updateRepo\"")
+    }
+
+    buildFeatures { buildConfig = true }
+
+    // Firma fija: imprescindible para que cada versión pueda instalarse encima de la anterior
+    signingConfigs {
+        create("ignis") {
+            if (keystorePath != null) {
+                storeFile = file(keystorePath)
+                storePassword = System.getenv("KEYSTORE_PASSWORD")
+                keyAlias = System.getenv("KEY_ALIAS")
+                keyPassword = System.getenv("KEY_PASSWORD")
+            }
+        }
     }
 
     buildTypes {
         release {
             isMinifyEnabled = false
-            // Firma con la clave de debug para que la APK release sea instalable sin keystore propio.
-            signingConfig = signingConfigs.getByName("debug")
+            // Con la clave de Ignis si está configurada; si no, con la de depuración (no actualizable)
+            signingConfig = if (keystorePath != null) signingConfigs.getByName("ignis") else signingConfigs.getByName("debug")
         }
     }
     compileOptions {

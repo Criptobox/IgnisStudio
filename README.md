@@ -37,6 +37,21 @@ Personaje llama que cambia según lo que hace el agente:
 
 Se ve en Inicio, en el Chat y en **Ajustes ▸ Avatar del agente**, donde se pueden previsualizar los estados.
 
+## Biblioteca: guardados, referencia y páginas ancladas
+- **Guardados**: toca el corazón en la Galería, en Plantillas, en Resultado o en el Chat.
+- **Referencia**: toca un diseño ▸ *Usar como referencia*. Ignis lo usa como base en todos tus pedidos. Aparece en el Chat sobre la caja de texto y se puede cambiar o quitar desde ahí.
+- **Anclados**: páginas de inspiración (Dribbble, Behance, Mobbin, Awwwards, Land-book, Pinterest) y las que añadas. Se abren dentro de la app; con **♥ Guardar** capturas lo que ves y pasa a Guardados, y con **Anclar** fijas la página.
+- **Todo queda en el cerebro** (`cerebro.json`): guardados, referencia, páginas ancladas y memoria. Al cambiar de modelo no se pierde nada, y `igContext()` arma el contexto que recibe el modelo en cada pedido.
+
+## Actualizaciones dentro de la app
+Cada cambio en `main` compila una versión nueva (`1.0.N`, donde N es el número de compilación) y la publica en **Releases**.
+En la app, **Ajustes ▸ Actualizaciones** la detecta (también al abrir, como mucho cada 6 h), la descarga con barra de progreso y la instala con el aviso de Android encima de la app. No hay que salir de la pantalla.
+
+Requisitos:
+1. **Repositorio público**, para que la app pueda leer las versiones sin iniciar sesión.
+2. **Firma fija**: añade en *Settings ▸ Secrets and variables ▸ Actions* los secretos `KEYSTORE_BASE64`, `KEYSTORE_PASSWORD`, `KEY_ALIAS` y `KEY_PASSWORD`. Sin ellos, cada versión se firma distinto y Android no deja instalar una encima de otra.
+3. La primera vez, Android pide permitir que Ignis Studio instale aplicaciones. Se hace desde el mismo panel y solo una vez.
+
 ## Navegación
 - Barra inferior flotante con burbuja violeta que se desliza a la pestaña activa.
 - **Vibración** al tocar (nativa en Android, respeta los ajustes del teléfono).
@@ -65,9 +80,9 @@ Memoria del proyecto que no depende del modelo: guarda tus pedidos, los cambios 
 ## Compilar la APK
 
 ### Con GitHub Actions (sin instalar nada)
-1. Sube esta carpeta a un repositorio nuevo en GitHub (rama `main`).
-2. Ve a la pestaña **Actions** → **Compilar APK** (se ejecuta solo en cada push, o pulsa *Run workflow*).
-3. Al terminar, descarga el artefacto **IgnisStudio-apk** con `app-debug.apk` y `app-release.apk`.
+1. Sube esta carpeta a un repositorio público en GitHub (rama `main`) y añade los secretos de firma.
+2. Cada push ejecuta **Compilar y publicar APK** (también con *Run workflow*).
+3. La APK queda en **Releases** como `IgnisStudio-1.0.N.apk`. Instálala una vez; las siguientes llegan desde la propia app.
 
 ### En tu PC
 Abre la carpeta en Android Studio (Hedgehog o superior) y pulsa *Build ▸ Build APK(s)*, o con Gradle 8.9 y JDK 17:
@@ -83,6 +98,9 @@ app/src/main/java/com/ignis/studio/MainActivity.kt   # WebView, selector de imá
 app/src/main/java/com/ignis/studio/DeviceBridge.kt   # Lee RAM, espacio, chip y arquitectura
 app/src/main/java/com/ignis/studio/BrainBridge.kt    # Guarda el cerebro en cerebro.json
 app/src/main/java/com/ignis/studio/HapticBridge.kt   # Vibración al tocar
+app/src/main/java/com/ignis/studio/UpdateBridge.kt   # Busca, descarga e instala actualizaciones
+app/src/main/java/com/ignis/studio/InspoActivity.kt  # Visor de páginas ancladas con captura
+app/src/main/java/com/ignis/studio/WebBridge.kt      # Abre páginas en el visor
 app/src/main/res/                   # Tema oscuro, icono con el orbe Eclipse
-.github/workflows/build-apk.yml     # Compilación automática
+.github/workflows/build-apk.yml     # Compila y publica cada versión en Releases
 ```
