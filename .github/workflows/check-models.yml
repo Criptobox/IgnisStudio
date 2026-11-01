@@ -6,34 +6,29 @@ on:
   push:
     branches-ignore: [ main ]
     paths: [ ".github/workflows/check-models.yml", "app/src/main/assets/js/app.js" ]
+  schedule:
+    - cron: "17 4 * * 1"   # cada lunes, por si algún modelo desaparece
 
 jobs:
   check:
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v5
       - name: Consultar Hugging Face
         run: |
-          check() {
-            h=$(curl -sI --max-time 30 "https://huggingface.co/$1/resolve/main/$2")
+          # Lee del catálogo (app.js) cada repositorio, archivo, SHA-256 y peso, y los compara con Hugging Face
+          fail=0
+          grep -oP "'[\w.-]+/[\w.-]+-GGUF','[^']+\.gguf','[0-9a-f]{64}',[0-9]+" app/src/main/assets/js/app.js | tr -d "'" > catalogo.txt
+          [ -s catalogo.txt ] || { echo "::error::No se encontró el catálogo"; exit 1; }
+          while IFS=, read -r repo file sha size; do
+            h=$(curl -sI --max-time 30 "https://huggingface.co/$repo/resolve/main/$file")
             code=$(echo "$h" | head -1 | awk '{print $2}')
-            size=$(echo "$h" | grep -i '^x-linked-size:' | tr -d '\r' | awk '{print $2}')
-            sha=$(echo "$h" | grep -i '^x-linked-etag:' | tr -d '\r"' | awk '{print $2}')
-            echo "MODEL|$code|$size|$sha|$1|$2"
-          }
-          check unsloth/Qwen3-0.6B-GGUF Qwen3-0.6B-Q4_K_M.gguf
-          check unsloth/Qwen3-1.7B-GGUF Qwen3-1.7B-Q4_K_M.gguf
-          check unsloth/Qwen3-4B-GGUF Qwen3-4B-Q4_K_M.gguf
-          check unsloth/Qwen3-8B-GGUF Qwen3-8B-Q4_K_M.gguf
-          check Qwen/Qwen2.5-Coder-1.5B-Instruct-GGUF qwen2.5-coder-1.5b-instruct-q4_k_m.gguf
-          check Qwen/Qwen2.5-Coder-3B-Instruct-GGUF qwen2.5-coder-3b-instruct-q4_k_m.gguf
-          check unsloth/gemma-3-1b-it-GGUF gemma-3-1b-it-Q4_K_M.gguf
-          check ggml-org/gemma-3-1b-it-GGUF gemma-3-1b-it-Q4_K_M.gguf
-          check unsloth/gemma-3-4b-it-GGUF gemma-3-4b-it-Q4_K_M.gguf
-          check ggml-org/gemma-3-4b-it-GGUF gemma-3-4b-it-Q4_K_M.gguf
-          check bartowski/Llama-3.2-1B-Instruct-GGUF Llama-3.2-1B-Instruct-Q4_K_M.gguf
-          check bartowski/Llama-3.2-3B-Instruct-GGUF Llama-3.2-3B-Instruct-Q4_K_M.gguf
-          check HuggingFaceTB/SmolLM2-1.7B-Instruct-GGUF smollm2-1.7b-instruct-q4_k_m.gguf
-          check bartowski/SmolLM2-1.7B-Instruct-GGUF SmolLM2-1.7B-Instruct-Q4_K_M.gguf
-          check unsloth/Phi-4-mini-instruct-GGUF Phi-4-mini-instruct-Q4_K_M.gguf
-          check unsloth/Qwen3-4B-Instruct-2507-GGUF Qwen3-4B-Instruct-2507-Q4_K_M.gguf
-          check unsloth/gemma-3n-E2B-it-GGUF gemma-3n-E2B-it-Q4_K_M.gguf
+            hsize=$(echo "$h" | grep -i '^x-linked-size:' | tr -d '\r' | awk '{print $2}')
+            hsha=$(echo "$h" | grep -i '^x-linked-etag:' | tr -d '\r"' | awk '{print $2}')
+            if [ "$code" = "302" ] && [ "$hsize" = "$size" ] && [ "$hsha" = "$sha" ]; then
+              echo "OK    $repo/$file ($size bytes)"
+            else
+              echo "::error::$repo/$file → HTTP $code, peso $hsize (esperado $size), sha $hsha"; fail=1
+            fi
+          done < catalogo.txt
+          exit $fail

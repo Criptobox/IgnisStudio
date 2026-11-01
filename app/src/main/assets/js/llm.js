@@ -12,7 +12,7 @@ let PEND=null;             // pedido que espera a que el modelo cargue
 let FILES=[];              // modelos en el teléfono [{file,size}|{file,part}]
 const fsz=b=>b>=1e9?(b/1e9).toFixed(1)+' GB':Math.max(1,Math.round(b/1e6))+' MB';
 /* velocidad aproximada en un teléfono de gama media-alta (tokens por segundo) */
-const MSX={q17:20,q4:9,q8:4,qc3:11,g1:26,g4:8,l3:11};
+const MSX={q06:40,g1:26,l1:26,q17:20,qc15:20,l3:11,qc3:11,g4:8,q4i:9,q8:4};
 
 /* Lee los modelos del teléfono y marca su estado: 0 no está, 1 descargado, 2 elegido */
 function llmSync(){if(!LLM())return;
@@ -35,13 +35,17 @@ function mBtn(m){const k=m[0],s=st.m[k];let ic=s?'play':'dl',lb=s?'Usar modelo':
  const del=LLM()&&s?`<button class="bx" style="border:0;background:none;${st.mdel==k?'color:#ff6a85':''}" aria-label="Borrar del teléfono" onclick="mDel('${k}')">${I(st.mdel==k?'x':'dots',12)}</button>`:I('dots',12);
  return `<button class="bx" aria-label="${lb}" onclick="mA('${k}')">${I(ic,11)}</button>${del}`}
 function dlBar(m){if(!LLM())return'';const k=m[0];
- if(DL&&DL.id==k)return `<div class="bar" style="margin-top:4px"><i style="width:${DL.p||0}%"></i></div><small class="st2">Descargando ${DL.p||0}% · ${fsz(DL.got||0)}${DL.size>0?' de '+fsz(DL.size):''} · ✕ pausa</small>`;
+ if(DL&&DL.id==k)return DL.check?`<small class="st2">Comprobando el archivo (SHA-256)…</small>`:`<div class="bar" style="margin-top:4px"><i style="width:${DL.p||0}%"></i></div><small class="st2">Descargando ${DL.p||0}% · ${fsz(DL.got||0)}${DL.size>0?' de '+fsz(DL.size):''} · ✕ pausa</small>`;
  const p=FILES.find(f=>f.part&&f.file==m[8]);if(p&&!st.m[k])return `<small class="st2" style="color:#ffb84a">En pausa · ${fsz(p.part)} descargados · toca ↓ para seguir</small>`;
  if(st.m[k]==2)return `<small class="st2" style="color:#3ddc97">${LD.busy&&LD.want==m[8]?'Cargando en memoria…':LD.file==m[8]?'En memoria · listo para el chat':'Se carga al escribir en el chat'}</small>`;
  return''}
 /* Importar y espacio usado (pestaña Modelos) */
-function llmTools(){if(!LLM())return'';const used=FILES.reduce((a,f)=>a+(f.size||f.part||0),0);
- return `<div class="cd" style="padding:8px 9px;margin:0 0 9px;display:flex;gap:8px;align-items:center"><div style="flex:1;font-size:8.5px;color:var(--mut)">${IMP?`Importando ${IMP.p||0}%<div class="bar"><i style="width:${IMP.p||0}%"></i></div>`:`Modelos en el teléfono<b style="display:block;color:var(--tx);font-size:10px">${FILES.filter(f=>f.size).length} · ${fsz(used)}</b>`}</div><button class="btn sm o" onclick="llmImport()" ${IMP?'disabled':''}>${I('dl',11)} Importar .gguf</button></div>`}
+function llmTools(){
+ if(!window.IgnisLLM)return window.IgnisDevice?'':'<p class="hint" style="margin:0 0 8px">Modo demostración: en la app Android los modelos se descargan y responden de verdad.</p>';
+ if(!LLM()){let s={};try{s=JSON.parse(IgnisLLM.status())}catch(e){}
+  return `<div class="cd" style="padding:8px 9px;margin:0 0 9px;font-size:8.5px;color:#ff6a85"><b style="display:block;font-size:10px">Motor local no disponible</b>${esc(s.err||'')}${s.abi?' · procesador: '+esc(s.abi):''}</div>`}
+ let s={};try{s=JSON.parse(IgnisLLM.status())}catch(e){}const used=FILES.reduce((a,f)=>a+(f.size||f.part||0),0);
+ return `<div class="cd" style="padding:8px 9px;margin:0 0 9px;display:flex;gap:8px;align-items:center"><div style="flex:1;font-size:8.5px;color:var(--mut)"><span style="color:#3ddc97">● Motor llama.cpp activo${s.v?' · v'+esc(s.v):''}</span><br>${IMP?`Importando ${IMP.p||0}%<div class="bar"><i style="width:${IMP.p||0}%"></i></div>`:`Modelos en el teléfono<b style="display:block;color:var(--tx);font-size:10px">${FILES.filter(f=>f.size).length} · ${fsz(used)}</b>`}</div><button class="btn sm o" onclick="llmImport()" ${IMP?'disabled':''}>${I('dl',11)} Importar .gguf</button></div>`}
 function llmImport(){if(IMP)return;IMP={p:0};R('models');IgnisLLM.importModel()}
 
 /* Tocar un modelo: descargar · usar · cargar */
@@ -54,7 +58,7 @@ function llmModel(k){const m=M.find(x=>x[0]==k);if(!m)return;const s=st.m[k];
   const part=(FILES.find(f=>f.part&&f.file==m[8])||{}).part||0,free=IgnisLLM.freeSpace();
   if(free>0&&free+part<sz(m)*1e9+3e8){setMood('error',2600);T('Necesitas ~'+(sz(m)+.3).toFixed(1)+' GB libres');return}
   DL={id:k,p:0,got:part,size:0};setMood('work');hap();T((part?'Continuando ':'Descargando ')+m[1]+'…');
-  IgnisLLM.download(k,HF+m[7]+'/resolve/main/'+m[8]+'?download=true',m[8]);R('models');return}
+  IgnisLLM.download(k,HF+m[7]+'/resolve/main/'+m[8]+'?download=true',m[8],m[9]||'',m[10]||0);R('models');return}
  if(s==1){for(const x in st.m)if(st.m[x]==2)st.m[x]=1;st.m[k]=2;BR.cfg.act=k;brSave();llmLoad(m);cambioModelo(k);R('models','chat','home');return}
  if(LD.file!=m[8])llmLoad(m);else T('Modelo activo y en memoria')}
 function llmLoad(m){if(LD.busy)return;LD.busy=1;LD.want=m[8];setMood('work');IgnisLLM.load(m[8],cp(m)=='justo'?2048:4096);if(cur()=='models')R('models')}
@@ -65,6 +69,7 @@ function mDel(k){const m=M.find(x=>x[0]==k);if(!m)return;
 /* Mensajes del lado nativo */
 window.onLlm=o=>{switch(o.st){
  case 'dl':DL=Object.assign(DL||{id:o.id},o);if(cur()=='models')R('models');break;
+ case 'dlcheck':DL=Object.assign(DL||{id:o.id},{p:100,check:1});if(cur()=='models')R('models');break;
  case 'dlok':DL=null;llmSync();setMood('done',2400);hap('ok');T('Modelo descargado · toca ▶ para usarlo');R('models','home','chat');break;
  case 'dlerr':DL=null;llmSync();setMood('error',2600);T(o.msg);R('models');break;
  case 'dlcancel':DL=null;llmSync();T('Descarga en pausa');R('models');break;
@@ -95,7 +100,8 @@ function llmSend(v){
 function llmGen(r){
  // historial corto: las respuestas se guardan sin el código, así cabe en la memoria del modelo
  const hist=(BR.chat||[]).slice(-4).map(x=>({r:x.r,c:String(x.c).slice(0,1200)}));
- const q=r.q+(/qwen3/i.test(r.m[1]+r.m[8])?' /no_think':'');
+ // Qwen3 con razonamiento: se le pide responder directo (la versión Instruct 2507 ya no razona)
+ const q=r.q+(/qwen3/i.test(r.m[8])&&!/2507/.test(r.m[8])?' /no_think':'');
  const msgs=[{r:'system',c:contexto()+'\n'+SYSP}].concat(hist,[{r:'user',c:q}]);
  GEN={raw:'',q:r.q,m:r.m};setMood('work');genPaint();
  try{IgnisLLM.generate(JSON.stringify({msgs,max:cp(r.m)=='justo'?1400:3000,temp:.7}))}catch(e){genDone('',0,0,'No se pudo iniciar el modelo')}}

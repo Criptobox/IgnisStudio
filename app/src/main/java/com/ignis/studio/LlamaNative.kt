@@ -3,9 +3,14 @@ package com.ignis.studio
 /** Enlace con el motor nativo (libignis_llm.so = llama.cpp + puente JNI). */
 object LlamaNative {
     /** false si la biblioteca nativa no está (por ejemplo, en un procesador sin 64 bits). */
+    /** Motivo si no se pudo cargar (se muestra en Modelos para saber qué pasa). */
+    var loadError: String? = null
+        private set
+
     val available: Boolean = try {
         System.loadLibrary("ignis_llm"); true
     } catch (e: Throwable) {
+        loadError = e.message ?: e.javaClass.simpleName
         false
     }
 

@@ -54,6 +54,15 @@ class LlmBridge(private val act: MainActivity, private val web: WebView) {
     @JavascriptInterface
     fun available(): Boolean = LlamaNative.available
 
+    /** Estado del motor para la interfaz: {ok, err, abi, v} */
+    @JavascriptInterface
+    fun status(): String = JSONObject()
+        .put("ok", LlamaNative.available)
+        .put("err", LlamaNative.loadError ?: "")
+        .put("abi", android.os.Build.SUPPORTED_ABIS.joinToString())
+        .put("v", BuildConfig.VERSION_NAME)
+        .toString()
+
     /** Modelos en el teléfono: [{file, size}] y descargas a medias [{file, part}]. */
     @JavascriptInterface
     fun models(): String {
@@ -75,8 +84,9 @@ class LlmBridge(private val act: MainActivity, private val web: WebView) {
 
     // ---------- Descargas (con reanudación) ----------
 
+    /** sha256 y size (bytes) son los oficiales de Hugging Face; vacíos o 0 si no se conocen. */
     @JavascriptInterface
-    fun download(id: String, url: String, file: String) {
+    fun download(id: String, url: String, file: String, sha256: String, size: Long) {
         val name = safeName(file) ?: return emit(ev("dlerr").put("id", id).put("msg", "Nombre de archivo no válido"))
         if (!url.startsWith("https://")) return emit(ev("dlerr").put("id", id).put("msg", "Dirección no válida"))
         if (!downloading.compareAndSet(false, true)) return emit(ev("dlerr").put("id", id).put("msg", "Ya hay una descarga en curso"))
@@ -95,7 +105,7 @@ class LlmBridge(private val act: MainActivity, private val web: WebView) {
                 val code = c.responseCode
                 if (code == 401 || code == 403) throw Exception("Este modelo pide iniciar sesión en Hugging Face. Descárgalo en el navegador y usa «Importar .gguf».")
                 if (code == 404) throw Exception("El archivo ya no está en Hugging Face")
-                if (code == 416 && have > 0) { finishDownload(part, name, id); return@thread }
+                if (code == 416 && have > 0) { finishDownload(part, name, id, sha256, size); return@thread }
                 if (code != 200 && code != 206) throw Exception("El servidor respondió $code")
                 val resumed = code == 206
                 var got = if (resumed) have else 0L
@@ -120,7 +130,7 @@ class LlmBridge(private val act: MainActivity, private val web: WebView) {
                     }
                 }
                 if (total > 0 && got != total) throw Exception("La descarga se cortó. Toca otra vez para continuar.")
-                finishDownload(part, name, id)
+                finishDownload(part, name, id, sha256, size)
             } catch (e: Exception) {
                 val msg = if (e is java.io.IOException || e.message.isNullOrBlank()) "Se perdió la conexión. Toca otra vez para continuar." else e.message
                 emit(ev("dlerr").put("id", id).put("msg", msg))
@@ -132,8 +142,22 @@ class LlmBridge(private val act: MainActivity, private val web: WebView) {
         }
     }
 
-    private fun finishDownload(part: File, name: String, id: String) {
+    private fun finishDownload(part: File, name: String, id: String, sha256: String, size: Long) {
         val dest = File(dir, name)
+        if (size > 0 && part.length() != size) {
+            part.delete(); throw Exception("El archivo descargado no tiene el tamaño correcto. Vuelve a descargarlo.")
+        }
+        // Huella oficial: garantiza que el modelo es exactamente el publicado y no está dañado
+        if (sha256.length == 64) {
+            emit(ev("dlcheck").put("id", id))
+            val md = java.security.MessageDigest.getInstance("SHA-256")
+            part.inputStream().use { inp ->
+                val buf = ByteArray(1024 * 1024)
+                while (true) { val n = inp.read(buf); if (n < 0) break; md.update(buf, 0, n) }
+            }
+            val got = md.digest().joinToString("") { "%02x".format(it) }
+            if (!got.equals(sha256, true)) { part.delete(); throw Exception("El archivo descargado está dañado. Vuelve a descargarlo.") }
+        }
         if (!checkGguf(part)) { part.delete(); throw Exception("El archivo descargado no es un modelo .gguf válido") }
         if (!part.renameTo(dest)) throw Exception("No se pudo guardar el modelo")
         emit(ev("dlok").put("id", id).put("file", name).put("size", dest.length()))
