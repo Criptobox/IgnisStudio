@@ -13,6 +13,7 @@ import android.os.Bundle
 import android.webkit.ValueCallback
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
+import android.webkit.WebResourceResponse
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.Toast
@@ -22,6 +23,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.webkit.WebViewAssetLoader
+import java.io.ByteArrayInputStream
 import java.io.File
 
 class MainActivity : AppCompatActivity() {
@@ -85,12 +87,18 @@ class MainActivity : AppCompatActivity() {
             settings.domStorageEnabled = true   // localStorage para los logos subidos (ig_lg)
             settings.allowFileAccess = false
             webViewClient = object : WebViewClient() {
-                override fun shouldInterceptRequest(v: WebView, r: WebResourceRequest) =
-                    loader.shouldInterceptRequest(r.url)
+                // Solo se carga contenido propio de la app: así ningún script de fuera puede
+                // llegar a los puentes nativos (IgnisBrain, IgnisUpdate…)
+                override fun shouldInterceptRequest(v: WebView, r: WebResourceRequest): WebResourceResponse? =
+                    when {
+                        r.url.host == APP_HOST -> loader.shouldInterceptRequest(r.url)
+                        r.url.scheme == "data" || r.url.scheme == "blob" -> null // logos incrustados y subidos
+                        else -> WebResourceResponse("text/plain", "utf-8", 403, "Bloqueado", emptyMap(), ByteArrayInputStream(ByteArray(0)))
+                    }
                 // Cualquier enlace externo se abre en el visor, sin salir de la app
                 override fun shouldOverrideUrlLoading(v: WebView, r: WebResourceRequest): Boolean {
                     val u = r.url
-                    if (u.host == "appassets.androidplatform.net") return false
+                    if (u.host == APP_HOST) return false
                     when (u.scheme?.lowercase()) {
                         "http", "https" -> openInspo(u.toString(), u.host ?: "")
                         else -> openExternal(u) // mailto:, tel:, intent:… van a la app que corresponda
@@ -112,7 +120,7 @@ class MainActivity : AppCompatActivity() {
         }
         updater = UpdateBridge(this, web)
         web.addJavascriptInterface(DeviceBridge(this), "IgnisDevice")
-        web.addJavascriptInterface(BrainBridge(this), "IgnisBrain")
+        web.addJavascriptInterface(BrainBridge(this, refs), "IgnisBrain")
         web.addJavascriptInterface(HapticBridge(web), "IgnisHaptic")
         web.addJavascriptInterface(updater, "IgnisUpdate")
         web.addJavascriptInterface(WebBridge(this), "IgnisWeb")
@@ -130,7 +138,7 @@ class MainActivity : AppCompatActivity() {
         })
 
         if (savedInstanceState != null) web.restoreState(savedInstanceState)
-        else web.loadUrl("https://appassets.androidplatform.net/assets/index.html")
+        else web.loadUrl("https://$APP_HOST/assets/index.html")
     }
 
     // Al volver del ajuste de permisos, la actualización sigue sola
@@ -152,4 +160,6 @@ class MainActivity : AppCompatActivity() {
         super.onSaveInstanceState(outState)
         web.saveState(outState)
     }
+
+    private companion object { const val APP_HOST = WebViewAssetLoader.DEFAULT_DOMAIN }
 }

@@ -34,9 +34,8 @@ jobs:
 
       - uses: android-actions/setup-android@v3
 
+      # Usa la versión de Gradle fijada en gradle/wrapper (./gradlew)
       - uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: "8.9"
 
       - name: Preparar la firma
         env:
@@ -55,13 +54,18 @@ jobs:
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
-          gradle assembleRelease --no-daemon
-          mv app/build/outputs/apk/release/app-release.apk "IgnisStudio-1.0.${VERSION_CODE}.apk"
+          ./gradlew assembleRelease --no-daemon
+          APK="IgnisStudio-1.0.${VERSION_CODE}.apk"
+          mv app/build/outputs/apk/release/app-release.apk "$APK"
+          # Huella SHA-256: la app la comprueba antes de instalar la actualización
+          sha256sum "$APK" | cut -d' ' -f1 > "$APK.sha256"
 
       - uses: actions/upload-artifact@v4
         with:
           name: IgnisStudio-apk
-          path: IgnisStudio-*.apk
+          path: |
+            IgnisStudio-*.apk
+            IgnisStudio-*.apk.sha256
 
       - name: Publicar versión
         uses: softprops/action-gh-release@v2
@@ -69,5 +73,7 @@ jobs:
           tag_name: v1.0.${{ github.run_number }}
           name: Ignis Studio 1.0.${{ github.run_number }}
           body: ${{ github.event.head_commit.message || 'Compilación manual' }}
-          files: IgnisStudio-*.apk
+          files: |
+            IgnisStudio-*.apk
+            IgnisStudio-*.apk.sha256
           make_latest: true

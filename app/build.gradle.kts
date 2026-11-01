@@ -38,7 +38,10 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            // R8: quita el código y los recursos que no se usan (APK más pequeña)
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             // Con la clave de Ignis si está configurada; si no, con la de depuración (no actualizable)
             signingConfig = if (keystorePath != null) signingConfigs.getByName("ignis") else signingConfigs.getByName("debug")
         }

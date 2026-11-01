@@ -4,7 +4,7 @@
 
 Agente de diseño con modelos locales — app Android construida a partir del diseño **Ignis Studio**.
 
-La app usa exactamente el HTML, CSS y JS del diseño original (`app/src/main/assets/index.html`), mostrado a pantalla completa dentro de un WebView nativo, una pantalla a la vez.
+La app usa exactamente el HTML, CSS y JS del diseño original (`app/src/main/assets/`), mostrado a pantalla completa dentro de un WebView nativo, una pantalla a la vez.
 
 ## Pantallas
 1. Pantalla de inicio · 2. Chat / Agente · 3. Modelos GGUF · 4. Proyecto Plantillas · 5. Resultado / Vista previa · 6. Skill Store · 7. MCP / Herramientas · 8. Biblioteca de Diseños · 9. Ajustes / Sistema · 10. Generar APK
@@ -41,6 +41,7 @@ Se ve en Inicio, en el Chat y en **Ajustes ▸ Avatar del agente**, donde se pue
 - **Guardados**: toca el corazón en la Galería, en Plantillas, en Resultado o en el Chat.
 - **Referencia**: toca un diseño ▸ *Usar como referencia*. Ignis lo usa como base en todos tus pedidos. Aparece en el Chat sobre la caja de texto y se puede cambiar o quitar desde ahí.
 - **Anclados**: páginas de inspiración (Dribbble, Behance, Mobbin, Awwwards, Land-book, Pinterest) y las que añadas. Se abren dentro de la app; con **♥ Guardar** capturas lo que ves y pasa a Guardados, y con **Anclar** fijas la página.
+- Al quitar una captura de Guardados también se borra del teléfono.
 - **Todo queda en el cerebro** (`cerebro.json`): guardados, referencia, páginas ancladas y memoria. Al cambiar de modelo no se pierde nada, y `igContext()` arma el contexto que recibe el modelo en cada pedido.
 
 ## Actualizaciones dentro de la app
@@ -51,6 +52,8 @@ Requisitos:
 1. **Repositorio público**, para que la app pueda leer las versiones sin iniciar sesión.
 2. **Firma fija**: añade en *Settings ▸ Secrets and variables ▸ Actions* los secretos `KEYSTORE_BASE64`, `KEYSTORE_PASSWORD`, `KEY_ALIAS` y `KEY_PASSWORD`. Sin ellos, cada versión se firma distinto y Android no deja instalar una encima de otra.
 3. La primera vez, Android pide permitir que Ignis Studio instale aplicaciones. Se hace desde el mismo panel y solo una vez.
+
+Seguridad: cada versión se publica con su huella SHA-256 (`IgnisStudio-1.0.N.apk.sha256`) y la app no instala una descarga que no coincida.
 
 ## Navegación
 - Barra inferior flotante con burbuja violeta que se desliza a la pestaña activa.
@@ -85,22 +88,31 @@ Memoria del proyecto que no depende del modelo: guarda tus pedidos, los cambios 
 3. La APK queda en **Releases** como `IgnisStudio-1.0.N.apk`. Instálala una vez; las siguientes llegan desde la propia app.
 
 ### En tu PC
-Abre la carpeta en Android Studio (Hedgehog o superior) y pulsa *Build ▸ Build APK(s)*, o con Gradle 8.9 y JDK 17:
+Abre la carpeta en Android Studio (Hedgehog o superior) y pulsa *Build ▸ Build APK(s)*, o desde la terminal con JDK 17 (el Gradle Wrapper descarga Gradle 8.9 solo):
 
 ```bash
-gradle assembleDebug
+./gradlew assembleDebug
 ```
+
+La versión de publicación (`assembleRelease`) pasa por R8, que quita el código y los recursos sin usar.
 
 ## Estructura
 ```
-app/src/main/assets/index.html      # Diseño original + modo app (una pantalla a la vez)
+app/src/main/assets/index.html      # Página principal (solo enlaza los archivos de abajo)
+app/src/main/assets/css/styles.css  # Estilos del diseño + modo app (una pantalla a la vez)
+app/src/main/assets/js/app.js       # Pantallas, chat, cerebro, biblioteca y actualizaciones
+app/src/main/assets/js/app-mode.js  # Modo app: navegación, gestos y bienvenida
+app/src/main/assets/js/logos.js     # Logos oficiales por defecto (imágenes incrustadas)
+app/src/main/assets/img/splash.svg  # Llama de la bienvenida en el navegador
 app/src/main/java/com/ignis/studio/MainActivity.kt   # WebView, selector de imágenes, botón atrás
 app/src/main/java/com/ignis/studio/DeviceBridge.kt   # Lee RAM, espacio, chip y arquitectura
-app/src/main/java/com/ignis/studio/BrainBridge.kt    # Guarda el cerebro en cerebro.json
+app/src/main/java/com/ignis/studio/BrainBridge.kt    # Guarda el cerebro en cerebro.json y limpia capturas huérfanas
 app/src/main/java/com/ignis/studio/HapticBridge.kt   # Vibración al tocar
 app/src/main/java/com/ignis/studio/UpdateBridge.kt   # Busca, descarga e instala actualizaciones
 app/src/main/java/com/ignis/studio/InspoActivity.kt  # Visor de páginas ancladas con captura
 app/src/main/java/com/ignis/studio/WebBridge.kt      # Abre páginas en el visor
 app/src/main/res/                   # Tema oscuro, icono con el orbe Eclipse
+app/proguard-rules.pro              # Reglas de R8 (conserva los puentes con el HTML)
+gradlew, gradle/wrapper/            # Gradle Wrapper (Gradle 8.9)
 .github/workflows/build-apk.yml     # Compila y publica cada versión en Releases
 ```

@@ -12,6 +12,7 @@ import org.json.JSONObject
 import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
+import java.security.MessageDigest
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.concurrent.thread
 
@@ -25,6 +26,9 @@ class UpdateBridge(private val act: MainActivity, private val web: WebView) {
     @Volatile private var apkUrl: String? = null
     @Volatile private var apkSize = 0L
     @Volatile private var version = ""
+    // Huella SHA-256 esperada de la APK (del campo "digest" de GitHub o del archivo .sha256 publicado)
+    @Volatile private var apkSha: String? = null
+    @Volatile private var shaUrl: String? = null
     // Evita búsquedas o descargas en paralelo si se toca dos veces
     private val busy = AtomicBoolean(false)
 
@@ -55,11 +59,14 @@ class UpdateBridge(private val act: MainActivity, private val web: WebView) {
                 val tag = j.optString("tag_name")
                 val code = tag.substringAfterLast('.').filter { it.isDigit() }.toIntOrNull() ?: 0
                 val assets = j.optJSONArray("assets")
-                val apk = (0 until (assets?.length() ?: 0)).map { assets!!.getJSONObject(it) }
-                    .firstOrNull { it.optString("name").endsWith(".apk") }
+                val list = (0 until (assets?.length() ?: 0)).map { assets!!.getJSONObject(it) }
+                val apk = list.firstOrNull { it.optString("name").endsWith(".apk") }
                 if (code > BuildConfig.VERSION_CODE && apk != null) {
                     apkUrl = apk.getString("browser_download_url")
                     apkSize = apk.optLong("size")
+                    apkSha = apk.optString("digest").takeIf { it.startsWith("sha256:") }?.removePrefix("sha256:")?.lowercase()
+                    shaUrl = list.firstOrNull { it.optString("name") == apk.optString("name") + ".sha256" }
+                        ?.optString("browser_download_url")
                     version = tag.removePrefix("v")
                     emit(state("new").put("v", version).put("size", apkSize).put("notes", j.optString("body")))
                 } else emit(state("ok"))
@@ -83,19 +90,21 @@ class UpdateBridge(private val act: MainActivity, private val web: WebView) {
             val f = File(act.cacheDir, "update.apk")
             var c: HttpURLConnection? = null
             try {
+                val expected = apkSha ?: shaUrl?.let { fetchSha(it) }
                 c = URL(url).openConnection() as HttpURLConnection
                 c.instanceFollowRedirects = true
                 c.setRequestProperty("User-Agent", "IgnisStudio/${BuildConfig.VERSION_NAME}")
                 c.connectTimeout = 15_000; c.readTimeout = 30_000
                 if (c.responseCode != 200) throw Exception("Descarga respondió ${c.responseCode}")
                 val total = c.contentLengthLong.takeIf { it > 0 } ?: apkSize
+                val md = MessageDigest.getInstance("SHA-256")
                 var got = 0L; var last = -1
                 c.inputStream.use { inp ->
                     f.outputStream().use { out ->
                         val buf = ByteArray(64 * 1024)
                         while (true) {
                             val n = inp.read(buf); if (n < 0) break
-                            out.write(buf, 0, n); got += n
+                            out.write(buf, 0, n); md.update(buf, 0, n); got += n
                             val p = if (total > 0) (got * 100 / total).toInt() else 0
                             if (p != last) { last = p; emit(state("dl").put("p", p).put("got", got).put("size", total).put("v", version)) }
                         }
@@ -103,6 +112,11 @@ class UpdateBridge(private val act: MainActivity, private val web: WebView) {
                 }
                 // Una descarga cortada no debe llegar al instalador
                 if (total > 0 && got != total) throw Exception("Descarga incompleta: $got de $total")
+                // La APK debe ser exactamente la publicada: si la huella no coincide, no se instala
+                val sha = md.digest().joinToString("") { "%02x".format(it) }
+                if (expected != null && sha != expected) {
+                    emit(state("err").put("msg", "La descarga no coincide con la versión publicada. Inténtalo de nuevo.")); return@thread
+                }
                 install(f)
             } catch (e: Exception) {
                 emit(state("err").put("msg", "La descarga se interrumpió. Inténtalo de nuevo."))
@@ -113,6 +127,18 @@ class UpdateBridge(private val act: MainActivity, private val web: WebView) {
             }
         }
     }
+
+    /** Lee la huella publicada junto a la APK ("IgnisStudio-1.0.N.apk.sha256"). */
+    private fun fetchSha(url: String): String? = try {
+        val c = URL(url).openConnection() as HttpURLConnection
+        c.setRequestProperty("User-Agent", "IgnisStudio/${BuildConfig.VERSION_NAME}")
+        c.connectTimeout = 10_000; c.readTimeout = 15_000
+        try {
+            if (c.responseCode != 200) null
+            else c.inputStream.bufferedReader().use { it.readText() }.trim().substringBefore(' ').lowercase()
+                .takeIf { Regex("[0-9a-f]{64}").matches(it) }
+        } finally { c.disconnect() }
+    } catch (e: Exception) { null }
 
     /** Abre el ajuste de Android para permitir que la app instale sus actualizaciones (solo la primera vez). */
     @JavascriptInterface
