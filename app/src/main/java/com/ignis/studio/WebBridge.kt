@@ -36,5 +36,12 @@ class WebBridge(private val act: MainActivity) {
     @JavascriptInterface
     fun saveFile(name: String, html: String) = act.runOnUiThread { act.saveHtml(safe(name) + ".html", html) }
 
+    /** Convierte un diseño en app: acceso directo en la pantalla de inicio. Resultado: window.onPinned(estado). */
+    @JavascriptInterface
+    fun pinApp(id: String, name: String, html: String, color: String) = act.runOnUiThread { act.pinDesign(id, name, html, color) }
+
+    @JavascriptInterface
+    fun canPin(): Boolean = androidx.core.content.pm.ShortcutManagerCompat.isRequestPinShortcutSupported(act)
+
     private fun safe(n: String) = n.replace(Regex("[^A-Za-z0-9áéíóúñÁÉÍÓÚÑ _-]"), "").trim().take(40).ifEmpty { "diseno-ignis" }
 }

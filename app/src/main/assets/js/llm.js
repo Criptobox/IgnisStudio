@@ -176,7 +176,7 @@ function genDone(text,n,ms,err){const g=GEN;GEN=null;const el=$('#lv');if(el)el.
  if(html)saveProject(polish(html),html,g.q,g.m[1]);
  let h=v?mdx(v,true):'';if(err)h+=(h?'<br>':'')+`<span style="color:#ff6a85">${esc(err)}</span>`;
  if(!h)h='No obtuve respuesta. Prueba a pedirlo de otra forma.';
- if(html)h+=`<div style="display:flex;gap:5px;margin-top:6px"><button class="btn sm" onclick="st.rt=0;to('result')">Ver resultado</button><button class="btn sm o" onclick="saveToggle('res')">Guardar</button></div>`;
+ if(html)h+=autoReview(html)+`<div style="display:flex;gap:5px;margin-top:6px"><button class="btn sm" onclick="st.rt=0;to('result')">Ver resultado</button><button class="btn sm o" onclick="saveToggle('res')">Guardar</button></div>`;
  const b=`<div class="bub bb">${h}</div>`;st.msgs.push(b);$('#ms').insertAdjacentHTML('beforeend',b);
  if(v)BR.chat=(BR.chat||[]).concat([{r:'user',c:g.q},{r:'assistant',c:v.replace(/```[\s\S]*?(```|$)/g,'[diseño HTML entregado]').slice(0,1200)}]).slice(-12);
  brSave();R('models');if(html)R('result','home');setMood(err&&!v?'error':'done',2600);hap(err?'tap':'ok');if(cur()!='chat')badge('chat',1);scrollChat()}

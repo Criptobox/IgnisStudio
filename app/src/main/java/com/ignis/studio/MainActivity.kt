@@ -22,6 +22,9 @@ import androidx.activity.OnBackPressedCallback
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
+import androidx.core.content.pm.ShortcutInfoCompat
+import androidx.core.content.pm.ShortcutManagerCompat
+import androidx.core.graphics.drawable.IconCompat
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.webkit.WebViewAssetLoader
 import org.json.JSONObject
@@ -77,6 +80,43 @@ class MainActivity : AppCompatActivity() {
         try { createHtml.launch(name) } catch (e: ActivityNotFoundException) {
             web.evaluateJavascript("window.onSaved&&onSaved(false)", null)
         }
+    }
+
+    /** Guarda el diseño y pide a Android añadir su acceso directo a la pantalla de inicio. */
+    fun pinDesign(id: String, name: String, html: String, color: String) {
+        fun done(s: String) = web.evaluateJavascript("window.onPinned&&onPinned('$s')", null)
+        if (!DesignActivity.ID.matches(id)) return done("err")
+        if (!ShortcutManagerCompat.isRequestPinShortcutSupported(this)) return done("nosupport")
+        try {
+            val dir = File(filesDir, "apps").apply { mkdirs() }
+            File(dir, "$id.html").writeText(html)
+            val label = name.trim().ifEmpty { "Mi diseño" }.take(24)
+            val intent = Intent(this, DesignActivity::class.java)
+                .setAction("com.ignis.studio.OPEN_DESIGN")
+                .putExtra(DesignActivity.EXTRA_ID, id)
+            val info = ShortcutInfoCompat.Builder(this, "design_$id")
+                .setShortLabel(label)
+                .setIcon(IconCompat.createWithAdaptiveBitmap(designIcon(label, color)))
+                .setIntent(intent)
+                .build()
+            done(if (ShortcutManagerCompat.requestPinShortcut(this, info, null)) "ok" else "err")
+        } catch (e: Exception) { done("err") }
+    }
+
+    /** Icono: degradado con la inicial del diseño (formato adaptable de Android). */
+    private fun designIcon(label: String, color: String): android.graphics.Bitmap {
+        val size = 432
+        val bmp = android.graphics.Bitmap.createBitmap(size, size, android.graphics.Bitmap.Config.ARGB_8888)
+        val c = android.graphics.Canvas(bmp)
+        val base = try { Color.parseColor(color) } catch (e: Exception) { Color.parseColor("#6d4aff") }
+        val p = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG)
+        p.shader = android.graphics.LinearGradient(0f, 0f, size.toFloat(), size.toFloat(), base, Color.parseColor("#ff6a9d"), android.graphics.Shader.TileMode.CLAMP)
+        c.drawRect(0f, 0f, size.toFloat(), size.toFloat(), p)
+        p.shader = null; p.color = Color.WHITE; p.textAlign = android.graphics.Paint.Align.CENTER
+        p.textSize = size * 0.34f; p.typeface = android.graphics.Typeface.DEFAULT_BOLD
+        val ch = label.firstOrNull { it.isLetterOrDigit() }?.uppercase() ?: "I"
+        c.drawText(ch, size / 2f, size / 2f - (p.descent() + p.ascent()) / 2, p)
+        return bmp
     }
 
     fun pickModel() = try { pickGguf.launch(arrayOf("*/*")) } catch (e: ActivityNotFoundException) { llm.onPicked(null) }

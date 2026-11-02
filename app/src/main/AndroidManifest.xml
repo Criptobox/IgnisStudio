@@ -37,6 +37,19 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/file_paths" />
         </provider>
+        <!-- Diseños convertidos en app (acceso directo en la pantalla de inicio) -->
+        <activity
+            android:name=".DesignActivity"
+            android:exported="true"
+            android:theme="@style/Theme.IgnisStudio"
+            android:taskAffinity=".design"
+            android:documentLaunchMode="intoExisting"
+            android:configChanges="orientation|screenSize|keyboardHidden|uiMode">
+            <intent-filter>
+                <action android:name="com.ignis.studio.OPEN_DESIGN" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
         <activity
             android:name=".InspoActivity"
             android:exported="false"
