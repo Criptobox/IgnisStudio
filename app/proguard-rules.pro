@@ -24,3 +24,13 @@
 -dontwarn org.jetbrains.annotations.**
 -dontwarn java.lang.management.**
 -dontwarn com.google.errorprone.annotations.**
+# Dependencias opcionales del SDK que la app no usa (trazas y esquemas JSON)
+-dontwarn com.google.auto.value.**
+-dontwarn io.opentelemetry.**
+-dontwarn com.github.victools.**
+-dontwarn java.lang.reflect.AnnotatedType
+-dontwarn java.lang.reflect.AnnotatedParameterizedType
+# Jackson lee los metadatos de Kotlin del SDK en tiempo de ejecución
+-keep class kotlin.Metadata { *; }
+-keep class kotlin.reflect.** { *; }
+-dontwarn kotlin.reflect.**
