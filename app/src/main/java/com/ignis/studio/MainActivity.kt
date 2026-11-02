@@ -10,6 +10,7 @@ import android.content.IntentFilter
 import android.graphics.Color
 import android.net.Uri
 import android.os.Bundle
+import android.speech.RecognizerIntent
 import android.webkit.ValueCallback
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
@@ -23,6 +24,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.webkit.WebViewAssetLoader
+import org.json.JSONObject
 import java.io.ByteArrayInputStream
 import java.io.File
 
@@ -42,6 +44,40 @@ class MainActivity : AppCompatActivity() {
 
     // Importar un modelo .gguf del teléfono (no tiene un tipo MIME propio: se aceptan todos)
     private val pickGguf = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri -> llm.onPicked(uri) }
+
+    // Dictado por voz con el reconocedor del teléfono (no necesita permiso de micrófono para la app)
+    private val voiceIn = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { r ->
+        val text = r.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)?.firstOrNull()
+        web.evaluateJavascript("window.onVoice&&onVoice(${JSONObject.quote(text ?: "")})", null)
+    }
+
+    fun startVoice() {
+        val i = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
+            .putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+            .putExtra(RecognizerIntent.EXTRA_LANGUAGE, "es-ES")
+            .putExtra(RecognizerIntent.EXTRA_PROMPT, "Describe tu idea")
+        try { voiceIn.launch(i) } catch (e: ActivityNotFoundException) {
+            web.evaluateJavascript("window.onVoice&&onVoice(null)", null)
+        }
+    }
+
+    // Guardar un diseño como archivo .html donde el usuario elija
+    private var pendingHtml: String? = null
+    private val createHtml = registerForActivityResult(ActivityResultContracts.CreateDocument("text/html")) { uri ->
+        val html = pendingHtml; pendingHtml = null
+        var ok = false
+        if (uri != null && html != null) ok = try {
+            contentResolver.openOutputStream(uri)?.use { it.write(html.toByteArray()) }; true
+        } catch (e: Exception) { false }
+        web.evaluateJavascript("window.onSaved&&onSaved(${if (uri == null) "null" else ok.toString()})", null)
+    }
+
+    fun saveHtml(name: String, html: String) {
+        pendingHtml = html
+        try { createHtml.launch(name) } catch (e: ActivityNotFoundException) {
+            web.evaluateJavascript("window.onSaved&&onSaved(false)", null)
+        }
+    }
 
     fun pickModel() = try { pickGguf.launch(arrayOf("*/*")) } catch (e: ActivityNotFoundException) { llm.onPicked(null) }
 

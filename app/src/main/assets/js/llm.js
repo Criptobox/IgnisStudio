@@ -102,7 +102,10 @@ function llmGen(r){
  const hist=(BR.chat||[]).slice(-4).map(x=>({r:x.r,c:String(x.c).slice(0,1200)}));
  // Qwen3 con razonamiento: se le pide responder directo (la versión Instruct 2507 ya no razona)
  const q=r.q+(/qwen3/i.test(r.m[8])&&!/2507/.test(r.m[8])?' /no_think':'');
- const msgs=[{r:'system',c:contexto()+'\n'+SYSP}].concat(hist,[{r:'user',c:q}]);
+ // si el pedido modifica el diseño actual, el modelo recibe su HTML (sin el tema ni las ilustraciones)
+ let uq=q;const cur0=BR.res&&(BR.res.raw||'');
+ if(cur0&&isEdit(r.q)){const lim=cp(r.m)=='justo'?2500:6000;uq='Este es el HTML del diseño actual:\n```html\n'+cur0.slice(0,lim)+'\n```\nModifícalo así: '+q+'\nDevuelve la página completa actualizada.'}
+ const msgs=[{r:'system',c:contexto()+'\n'+SYSP}].concat(hist,[{r:'user',c:uq}]);
  GEN={raw:'',q:r.q,m:r.m};setMood('work');genPaint();
  try{IgnisLLM.generate(JSON.stringify({msgs,max:cp(r.m)=='justo'?1400:3000,temp:.7}))}catch(e){genDone('',0,0,'No se pudo iniciar el modelo')}}
 /* texto visible: sin el razonamiento <think> */
@@ -166,18 +169,18 @@ const titleOf=h=>{const m=/<title>([^<]{1,60})<\/title>/i.exec(h)||/<h1[^>]*>([^
 function genDone(text,n,ms,err){const g=GEN;GEN=null;const el=$('#lv');if(el)el.remove();if(!g)return;
  const v=vis(text||g.raw).t,html=extractHtml(v);
  if(n>4&&ms>0){BR.tps=BR.tps||{};BR.tps[g.m[0]]=+(n/(ms/1000)).toFixed(1)}
- if(html)BR.res={html:polish(html),p:1,n:titleOf(html)||g.q.slice(0,40),q:g.q,m:g.m[1],d:fecha()};
+ if(html)saveProject(polish(html),html,g.q,g.m[1]);
  let h=v?mdx(v,true):'';if(err)h+=(h?'<br>':'')+`<span style="color:#ff6a85">${esc(err)}</span>`;
  if(!h)h='No obtuve respuesta. Prueba a pedirlo de otra forma.';
  if(html)h+=`<div style="display:flex;gap:5px;margin-top:6px"><button class="btn sm" onclick="st.rt=0;to('result')">Ver resultado</button><button class="btn sm o" onclick="saveToggle('res')">Guardar</button></div>`;
  const b=`<div class="bub bb">${h}</div>`;st.msgs.push(b);$('#ms').insertAdjacentHTML('beforeend',b);
  if(v)BR.chat=(BR.chat||[]).concat([{r:'user',c:g.q},{r:'assistant',c:v.replace(/```[\s\S]*?(```|$)/g,'[diseño HTML entregado]').slice(0,1200)}]).slice(-12);
- brSave();R('models');if(html)R('result');setMood(err&&!v?'error':'done',2600);hap(err?'tap':'ok');if(cur()!='chat')badge('chat',1);scrollChat()}
+ brSave();R('models');if(html)R('result','home');setMood(err&&!v?'error':'done',2600);hap(err?'tap':'ok');if(cur()!='chat')badge('chat',1);scrollChat()}
 
 /* ===== Resultado generado ===== */
 const resUp=()=>{if(BR.res&&!BR.res.p){BR.res.html=polish(BR.res.html);BR.res.p=1;brSave()}};
 const resView=()=>(resUp(),`<div class="rsv"><iframe sandbox="" title="Vista previa" srcdoc="${esc(BR.res.html)}"></iframe></div><p class="hint" style="margin:5px 0 0">${esc(BR.res.n)} · ${esc(BR.res.m)} · ${esc(BR.res.d)}</p>`);
-const resCode=()=>`<pre class="rsc">${esc(BR.res.html)}</pre>`;
+const resCode=()=>`<div style="display:flex;justify-content:flex-end;margin-bottom:6px"><button class="btn sm o" onclick="resExport()">${I('code',11)} Copiar código</button></div><pre class="rsc">${esc(BR.res.html)}</pre>`;
 const resFiles=()=>`<div class="cd li"><span class="ic" style="background:#2b2f78">${I('code',13)}</span><div class="x"><b>index.html</b><small>${fsz(new Blob([BR.res.html]).size)} · HTML y CSS en un archivo</small></div></div>`;
 function resExport(){if(!BR.res){T('ZIP exportado');return}const h=BR.res.html;
  const fb=()=>{const t=document.createElement('textarea');t.value=h;document.body.append(t);t.select();let ok=false;try{ok=document.execCommand('copy')}catch(e){}t.remove();T(ok?'Código copiado':'No se pudo copiar')};
