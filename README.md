@@ -9,17 +9,29 @@ La app usa exactamente el HTML, CSS y JS del diseño original (`app/src/main/ass
 ## Pantallas
 1. Pantalla de inicio · 2. Chat / Agente · 3. Modelos GGUF · 4. Proyecto Plantillas · 5. Resultado / Vista previa · 6. Skill Store · 7. MCP / Herramientas · 8. Biblioteca de Diseños · 9. Ajustes / Sistema · 10. Generar APK
 
-## Funciones (las del diseño)
-- Barra inferior: Inicio, Chat, Crear, Biblioteca, Ajustes; botón ← de cada pantalla y botón atrás de Android.
-- Chat con atajos (Diseño Web, App Android, UI/UX, Recrear, Mejorar, Generar Código), envío con Enter y chip del modelo activo.
-- Modelos: pestañas Todos / Cargados / Recom. / Nube, descargar → cargar modelo, conexión a proveedores en la nube.
-- Plantillas con búsqueda y filtros; Resultado con Vista / Código / Archivos, Exportar ZIP y Abrir en navegador.
-- Skill Store y MCP: instalar / desinstalar, filtros por pestaña.
-- Biblioteca con filtros; Ajustes con selector de avatar (20 orbes) y animación on/off.
-- Generar APK con los 5 pasos animados.
-- “Toca un logo para ponerle el oficial”: abre la galería del teléfono y guarda el logo (localStorage).
+## Funciones
+- **Chat con modelos reales**: locales (llama.cpp, sin internet) o en la nube con tu clave de API. Respuesta en directo, *Detener*, historial (reloj) y nueva conversación.
+- **Caja del chat**: 🖼 imagen de referencia (Ignis extrae su paleta de colores), 🎤 dictado por voz, ↗ compartir el diseño.
+- **Pedidos que editan**: «cámbialo a verde», «añade precios»… envían el diseño actual al modelo para modificarlo.
+- **Resultado**: vista aislada (sin scripts), código completo, *Guardar HTML* (Descargas, Drive…), *Compartir* y pantalla completa. Cada diseño queda en **Proyectos recientes** (Inicio).
+- **Plantillas**: cada una es un pedido real al agente.
+- **Crear app**: añade un icono en la pantalla de inicio que abre el diseño a pantalla completa.
+- **Skills**: UI Components, Tailwind Style, React Ready, Android Builder, Design System, Modo oscuro, Accesibilidad y Animaciones; cada skill instalada añade instrucciones al agente.
+- **Herramientas (MCP)**: revisión automática del HTML (Playwright), Figma como referencia, guardar en Drive, compartir a Mega e inspiración en Dribbble (Browser).
+- **Ajustes**: Apariencia (paleta de los diseños, vibración), Almacenamiento (espacio, borrar proyectos), Rendimiento (contexto, longitud, creatividad, hilos), Avatar, Cerebro y Actualizaciones.
+- Barra inferior con gestos, botón atrás de Android y «toca un logo para ponerle el oficial».
 
-> En la APK, los modelos y el chat son **reales** (ver *Modelos locales*). Compilar APK sigue siendo una animación de demostración. En el navegador todo funciona en modo demostración.
+## Modelos en la nube
+En **Modelos ▸ Nube** pega tu clave de API y elige el modelo de tu cuenta:
+
+| Servicio | Dónde se consigue la clave |
+|---|---|
+| Claude (Anthropic) | console.anthropic.com ▸ API Keys · por defecto Claude Opus 5.5, con respaldo automático si un modelo rechaza la petición |
+| ChatGPT (OpenAI) | platform.openai.com ▸ API keys |
+| Gemini (Google) | aistudio.google.com ▸ Get API key |
+| DeepSeek · Mistral · Grok · Perplexity | sus consolas de desarrollador |
+
+Las claves se guardan cifradas con el almacén seguro de Android. Los pedidos y el contexto del proyecto se envían a ese servicio, que cobra según su tarifa. Copilot no tiene una API pública para apps.
 
 ## Ignis, el avatar del agente
 Personaje llama que cambia según lo que hace el agente:
@@ -120,6 +132,13 @@ app/src/main/assets/js/llm.js       # Modelos locales y chat en directo (usa win
 app/src/main/cpp/                   # llama.cpp (se descarga al compilar) + puente JNI ignis_llm.cpp
 app/src/main/java/com/ignis/studio/LlmBridge.kt      # Descarga, importa, carga y genera con los modelos
 app/src/main/java/com/ignis/studio/LlamaNative.kt    # Enlace con la biblioteca nativa
+app/src/main/java/com/ignis/studio/CloudBridge.kt    # Modelos en la nube y claves cifradas
+app/src/main/java/com/ignis/studio/ClaudeStream.java # Claude con el SDK oficial de Anthropic
+app/src/main/java/com/ignis/studio/DesignActivity.kt # Diseños convertidos en app
+app/src/main/assets/js/extras.js    # Proyectos, historial, voz, imagen, compartir, plantillas
+app/src/main/assets/js/ajustes.js   # Skills y Ajustes
+app/src/main/assets/js/cloud.js     # Pestaña Nube
+app/src/main/assets/js/tools.js     # Crear app y herramientas MCP
 app/src/main/java/com/ignis/studio/MainActivity.kt   # WebView, selector de imágenes, botón atrás
 app/src/main/java/com/ignis/studio/DeviceBridge.kt   # Lee RAM, espacio, chip y arquitectura
 app/src/main/java/com/ignis/studio/BrainBridge.kt    # Guarda el cerebro en cerebro.json y limpia capturas huérfanas
