@@ -92,22 +92,24 @@ function llmSend(v){
  if(GEN||PEND){T('Ignis todavía está respondiendo');return}
  const rf=refInfo();recordar('pedido',v+(rf?' · ref: '+rf.n:''));
  const u=`<div class="bub bu">${esc(v)}</div>`;st.msgs.push(u);$('#ms').insertAdjacentHTML('beforeend',u);$('#ci').value='';
- const m=llmActive();
+ const cm=cloudModel(),m=cm||llmActive();
  if(!m){setMood('error',2200);llmBot('Para responderte necesito un modelo en el teléfono. Descarga uno en <b>Modelos</b>: los marcados como <b>Compatible</b> van bien en tu teléfono.<div style="margin-top:6px"><button class="btn sm" onclick="st.mt=2;to(\'models\')">Ver modelos</button></div>');return}
  $('#ms').insertAdjacentHTML('beforeend','<div class="bub bb" id="lv"><span class="dt"></span><span class="dt"></span><span class="dt"></span></div>');scrollChat();
  setMood('think');const req={q:v,m};
- if(LD.file==m[8])llmGen(req);else{PEND=req;$('#lv').insertAdjacentHTML('beforeend',' <small>Cargando '+esc(m[1])+'…</small>');llmLoad(m)}}
+ if(cm||LD.file==m[8])llmGen(req);else{PEND=req;$('#lv').insertAdjacentHTML('beforeend',' <small>Cargando '+esc(m[1])+'…</small>');llmLoad(m)}}
 function llmGen(r){
  // historial corto: las respuestas se guardan sin el código, así cabe en la memoria del modelo
  const hist=(BR.chat||[]).slice(-4).map(x=>({r:x.r,c:String(x.c).slice(0,1200)}));
  // Qwen3 con razonamiento: se le pide responder directo (la versión Instruct 2507 ya no razona)
  const q=r.q+(/qwen3/i.test(r.m[8])&&!/2507/.test(r.m[8])?' /no_think':'');
  // si el pedido modifica el diseño actual, el modelo recibe su HTML (sin el tema ni las ilustraciones)
- let uq=q;const cur0=BR.res&&(BR.res.raw||'');
- if(cur0&&isEdit(r.q)){const lim=cp(r.m)=='justo'?2500:6000;uq='Este es el HTML del diseño actual:\n```html\n'+cur0.slice(0,lim)+'\n```\nModifícalo así: '+q+'\nDevuelve la página completa actualizada.'}
+ const isCl=String(r.m[0]).startsWith('cloud:');let uq=q;const cur0=BR.res&&(BR.res.raw||'');
+ if(cur0&&isEdit(r.q)){const cl=String(r.m[0]).startsWith('cloud:'),lim=cl?30000:cp(r.m)=='justo'?2500:6000;uq='Este es el HTML del diseño actual:\n```html\n'+cur0.slice(0,lim)+'\n```\nModifícalo así: '+q+'\nDevuelve la página completa actualizada.'}
  const sk=skillPrompt();
  const msgs=[{r:'system',c:contexto()+'\n'+SYSP+(sk?'\nAplica además estas skills:\n'+sk:'')}].concat(hist,[{r:'user',c:uq}]);
  GEN={raw:'',q:r.q,m:r.m};setMood('work');genPaint();
+ const temp=BR.cfg.temp!=null?+BR.cfg.temp:.7;
+ if(isCl){try{IgnisCloud.generate(JSON.stringify({id:r.m[9],model:r.m[10],msgs,max:+BR.cfg.max||16000,temp}))}catch(e){genDone('',0,0,'No se pudo conectar con el servicio')}return}
  try{IgnisLLM.generate(JSON.stringify({msgs,max:+BR.cfg.max||(cp(r.m)=='justo'?1400:3000),temp:BR.cfg.temp!=null?+BR.cfg.temp:.7}))}catch(e){genDone('',0,0,'No se pudo iniciar el modelo')}}
 /* texto visible: sin el razonamiento <think> */
 function vis(raw){let t=String(raw||'').replace(/<think>[\s\S]*?<\/think>/g,'');const i=t.indexOf('<think>');const th=i>=0;if(th)t=t.slice(0,i);return{t:t.trim(),th}}
@@ -118,8 +120,9 @@ function mdx(t,final){return String(t).split('```').map((p,i)=>{
  return final?`<span class="cbk">${I('code',11)} ${esc(lang)} · ${n} líneas</span>`:`<pre class="cbl"><small>${esc(lang)} · ${n} líneas…</small>${esc(code.slice(-700))}</pre>`}).join('')}
 function genPaint(){const el=$('#lv');if(!el||!GEN)return;const v=vis(GEN.raw);
  const near=(()=>{const s=$('#p-chat .scr');return !s||s.scrollHeight-s.scrollTop-s.clientHeight<120})();
- el.innerHTML=(v.t?mdx(v.t,false):'<span class="dt"></span><span class="dt"></span><span class="dt"></span>')+(v.th?'<br><small style="color:var(--mut)">Pensando…</small>':'')+'<div style="margin-top:6px"><button class="btn sm o" onclick="IgnisLLM.stop()">Detener</button></div>';
+ el.innerHTML=(v.t?mdx(v.t,false):'<span class="dt"></span><span class="dt"></span><span class="dt"></span>')+(v.th?'<br><small style="color:var(--mut)">Pensando…</small>':'')+'<div style="margin-top:6px"><button class="btn sm o" onclick="llmStop()">Detener</button></div>';
  if(near)scrollChat()}
+function llmStop(){try{window.IgnisLLM&&IgnisLLM.stop()}catch(e){}try{window.IgnisCloud&&IgnisCloud.stop()}catch(e){}}
 function genFail(msg){const el=$('#lv');if(el)el.remove();setMood('error',2600);llmBot(`<span style="color:#ff6a85">${esc(msg)}</span>`)}
 /* ===== Pulido del HTML generado: tema base + ilustraciones =====
    Los modelos pequeños a veces entregan HTML sin estilos o con imágenes inventadas.

@@ -10,3 +10,17 @@
 -keepclassmembers class * implements com.ignis.studio.LlamaNative$TokenCallback {
     boolean onToken(byte[]);
 }
+
+# SDK de Anthropic (Claude): usa Jackson y reflexión para leer las respuestas
+-keep class com.anthropic.** { *; }
+-keep class com.fasterxml.jackson.** { *; }
+-keepattributes Signature,*Annotation*,InnerClasses,EnclosingMethod
+-dontwarn com.anthropic.**
+-dontwarn com.fasterxml.jackson.**
+-dontwarn okhttp3.**
+-dontwarn okio.**
+-dontwarn org.slf4j.**
+-dontwarn javax.annotation.**
+-dontwarn org.jetbrains.annotations.**
+-dontwarn java.lang.management.**
+-dontwarn com.google.errorprone.annotations.**

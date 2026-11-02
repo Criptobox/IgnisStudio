@@ -171,6 +171,7 @@ class MainActivity : AppCompatActivity() {
         web.addJavascriptInterface(WebBridge(this), "IgnisWeb")
         llm = LlmBridge(this, web)
         web.addJavascriptInterface(llm, "IgnisLLM")
+        web.addJavascriptInterface(CloudBridge(this, web), "IgnisCloud")
         setContentView(web)
 
         ContextCompat.registerReceiver(

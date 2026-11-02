@@ -36,7 +36,11 @@ android {
     }
 
     // Las variantes del motor (libggml-cpu-*.so) se buscan en la carpeta de bibliotecas: hay que extraerlas
-    packaging { jniLibs { useLegacyPackaging = true } }
+    packaging {
+        jniLibs { useLegacyPackaging = true }
+        // archivos de licencia repetidos en las bibliotecas del SDK de Claude
+        resources { excludes += listOf("/META-INF/{AL2.0,LGPL2.1}", "META-INF/DEPENDENCIES", "META-INF/INDEX.LIST", "META-INF/versions/9/OSGI-INF/MANIFEST.MF") }
+    }
 
     buildFeatures { buildConfig = true }
 
@@ -68,7 +72,10 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-    kotlinOptions { jvmTarget = "17" }
+}
+
+kotlin {
+    compilerOptions { jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17) }
 }
 
 dependencies {
@@ -76,4 +83,6 @@ dependencies {
     implementation("androidx.appcompat:appcompat:1.7.0")
     implementation("androidx.webkit:webkit:1.11.0")
     implementation("androidx.core:core-splashscreen:1.0.1")
+    // SDK oficial de Anthropic para hablar con Claude (modelos en la nube)
+    implementation("com.anthropic:anthropic-java:3.2.0")
 }

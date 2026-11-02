@@ -172,3 +172,6 @@ header#hd0,.t{display:none!important}
 
 /* Opciones en Ajustes */
 .opt{margin-top:7px}.opt small{display:block;color:var(--mut);font-size:8px;margin-bottom:3px}.opt>div{display:flex;flex-wrap:wrap;gap:4px}
+
+/* Selector de modelo en la nube */
+.csel{width:100%;padding:6px 8px;border-radius:8px;border:1px solid var(--ln);background:#0b0d22;color:var(--tx);font:inherit;font-size:9px}
