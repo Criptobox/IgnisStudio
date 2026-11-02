@@ -119,6 +119,18 @@ class MainActivity : AppCompatActivity() {
         return bmp
     }
 
+    // Permiso de Google Drive (pantalla de Google la primera vez)
+    private var driveCb: ((Intent?) -> Unit)? = null
+    private val driveAuth = registerForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { r ->
+        driveCb?.invoke(if (r.resultCode == Activity.RESULT_OK) r.data else null); driveCb = null
+    }
+
+    fun launchDriveAuth(pi: android.app.PendingIntent, cb: (Intent?) -> Unit) {
+        driveCb = cb
+        try { driveAuth.launch(androidx.activity.result.IntentSenderRequest.Builder(pi.intentSender).build()) }
+        catch (e: Exception) { driveCb = null; cb(null) }
+    }
+
     fun pickModel() = try { pickGguf.launch(arrayOf("*/*")) } catch (e: ActivityNotFoundException) { llm.onPicked(null) }
 
     // Lo que se guardó o ancló en el visor de inspiración vuelve a la Biblioteca (y al cerebro)
@@ -212,6 +224,7 @@ class MainActivity : AppCompatActivity() {
         llm = LlmBridge(this, web)
         web.addJavascriptInterface(llm, "IgnisLLM")
         web.addJavascriptInterface(CloudBridge(this, web), "IgnisCloud")
+        web.addJavascriptInterface(DriveBridge(this, web), "IgnisDrive")
         setContentView(web)
 
         ContextCompat.registerReceiver(

@@ -85,4 +85,6 @@ dependencies {
     implementation("androidx.core:core-splashscreen:1.0.1")
     // SDK oficial de Anthropic para hablar con Claude (modelos en la nube)
     implementation("com.anthropic:anthropic-java:3.2.0")
+    // Inicio de sesión con Google para leer tus diseños de Drive
+    implementation("com.google.android.gms:play-services-auth:21.2.0")
 }

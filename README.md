@@ -21,6 +21,19 @@ La app usa exactamente el HTML, CSS y JS del diseño original (`app/src/main/ass
 - **Ajustes**: Apariencia (paleta de los diseños, vibración), Almacenamiento (espacio, borrar proyectos), Rendimiento (contexto, longitud, creatividad, hilos), Avatar, Cerebro y Actualizaciones.
 - Barra inferior con gestos, botón atrás de Android y «toca un logo para ponerle el oficial».
 
+## Google Drive: Ignis busca tus diseños
+En **Herramientas ▸ Drive ▸ Usar** conectas tu cuenta de Google (solo lectura). Después:
+- Cuando pides algo como «una landing como mis diseños de Drive», Ignis busca en tu Drive con las palabras del pedido y pasa al modelo los 3 archivos más relevantes: imágenes (con su paleta de colores), HTML y documentos o presentaciones de Google (su texto). Con **Buscar en Drive en cada pedido** lo hace siempre.
+- En el explorador puedes buscar tú y tocar **Usar**: una imagen pasa a ser la referencia, un HTML se abre como proyecto para editarlo y un documento va al chat.
+
+### Configurarlo (una vez, en Google Cloud)
+1. En [console.cloud.google.com](https://console.cloud.google.com) crea un proyecto.
+2. **APIs y servicios ▸ Biblioteca**: activa **Google Drive API**.
+3. **Pantalla de consentimiento de OAuth** (Google Auth Platform): tipo *Externo*, nombre «Ignis Studio», tu correo. En **Permisos de acceso a los datos** añade `.../auth/drive.readonly`. En **Público ▸ Usuarios de prueba** añade las cuentas de Google que lo usarán.
+4. **Clientes ▸ Crear cliente ▸ Android**: paquete `com.ignis.studio` y la **huella SHA-1** de la clave de firma de las versiones publicadas (`keytool -list -v -keystore ignis.jks`).
+
+Mientras la app esté en modo de prueba, Google muestra el aviso «Google no ha verificado esta aplicación» (toca *Continuar*) y solo pueden entrar los usuarios de prueba. Para abrirlo a cualquiera hay que pedir la verificación de Google, porque `drive.readonly` es un permiso restringido.
+
 ## Modelos en la nube
 En **Modelos ▸ Nube** pega tu clave de API y elige el modelo de tu cuenta:
 
@@ -139,6 +152,8 @@ app/src/main/assets/js/extras.js    # Proyectos, historial, voz, imagen, compart
 app/src/main/assets/js/ajustes.js   # Skills y Ajustes
 app/src/main/assets/js/cloud.js     # Pestaña Nube
 app/src/main/assets/js/tools.js     # Crear app y herramientas MCP
+app/src/main/assets/js/drive.js     # Búsqueda en Google Drive
+app/src/main/java/com/ignis/studio/DriveBridge.kt    # Inicio de sesión con Google y API de Drive
 app/src/main/java/com/ignis/studio/MainActivity.kt   # WebView, selector de imágenes, botón atrás
 app/src/main/java/com/ignis/studio/DeviceBridge.kt   # Lee RAM, espacio, chip y arquitectura
 app/src/main/java/com/ignis/studio/BrainBridge.kt    # Guarda el cerebro en cerebro.json y limpia capturas huérfanas

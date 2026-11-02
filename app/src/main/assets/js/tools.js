@@ -23,7 +23,7 @@ function mcpToggle(i){st.mci[i]=!st.mci[i];BR.cfg.mci=st.mci;brSave();hap(st.mci
 function mcpUse(i){hap();
  if(i==0){if(!BR.res){T('Primero pide un diseño');return}reviewOpen();return}
  if(i==1){if(window.IgnisWeb){IgnisWeb.open('https://www.figma.com/community','Figma');T('Abre un diseño y toca ♥ Guardar para usarlo como referencia')}else window.open('https://www.figma.com/community','_blank');return}
- if(i==2){if(!BR.res){T('Primero pide un diseño');return}saveRes();T('Elige Google Drive en el selector');return}
+ if(i==2){driveSheet();return}
  if(i==3){if(!BR.res){T('Primero pide un diseño');return}shareRes();T('Elige Mega en el menú de compartir');return}
  if(i==4){const q=((BR.chat||[]).filter(x=>x.r=='user').pop()||{}).c||'landing page';
   const w=q.replace(/^(crea|diseña|haz|genera)\s+(una?\s+)?/i,'').split(/\s+/).slice(0,5).join(' ');

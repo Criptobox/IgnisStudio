@@ -97,7 +97,10 @@ function llmSend(v){
  $('#ms').insertAdjacentHTML('beforeend','<div class="bub bb" id="lv"><span class="dt"></span><span class="dt"></span><span class="dt"></span></div>');scrollChat();
  setMood('think');const req={q:v,m};
  if(cm||LD.file==m[8])llmGen(req);else{PEND=req;$('#lv').insertAdjacentHTML('beforeend',' <small>Cargando '+esc(m[1])+'…</small>');llmLoad(m)}}
-function llmGen(r){
+function llmGen(r,dctx){
+ // Google Drive: primero se buscan los diseños relacionados y se añaden al pedido
+ if(dctx===undefined&&driveWanted(r.q)){GEN={raw:'',q:r.q,m:r.m};const el=$('#lv');if(el)el.innerHTML='<small>'+I('drive',11)+' Buscando en tu Google Drive…</small>';
+  driveCtx(r.q,String(r.m[0]).startsWith('cloud:')).then(c=>{if(c)T('Encontré diseños en tu Drive');llmGen(r,c)},e=>{T('Drive: '+e.message);llmGen(r,'')});return}
  // historial corto: las respuestas se guardan sin el código, así cabe en la memoria del modelo
  const hist=(BR.chat||[]).slice(-4).map(x=>({r:x.r,c:String(x.c).slice(0,1200)}));
  // Qwen3 con razonamiento: se le pide responder directo (la versión Instruct 2507 ya no razona)
@@ -105,6 +108,7 @@ function llmGen(r){
  // si el pedido modifica el diseño actual, el modelo recibe su HTML (sin el tema ni las ilustraciones)
  const isCl=String(r.m[0]).startsWith('cloud:');let uq=q;const cur0=BR.res&&(BR.res.raw||'');
  if(cur0&&isEdit(r.q)){const cl=String(r.m[0]).startsWith('cloud:'),lim=cl?30000:cp(r.m)=='justo'?2500:6000;uq='Este es el HTML del diseño actual:\n```html\n'+cur0.slice(0,lim)+'\n```\nModifícalo así: '+q+'\nDevuelve la página completa actualizada.'}
+ if(dctx)uq=dctx+'\n\nPedido del usuario: '+uq;
  const sk=skillPrompt();
  const msgs=[{r:'system',c:contexto()+'\n'+SYSP+(sk?'\nAplica además estas skills:\n'+sk:'')}].concat(hist,[{r:'user',c:uq}]);
  GEN={raw:'',q:r.q,m:r.m};setMood('work');genPaint();
