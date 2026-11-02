@@ -169,3 +169,6 @@ header#hd0,.t{display:none!important}
 
 /* Botones de la caja del chat (imagen, voz, compartir) */
 .in .ib{background:none;border:0;color:inherit;padding:2px;margin:0;display:grid;place-items:center;cursor:pointer}
+
+/* Opciones en Ajustes */
+.opt{margin-top:7px}.opt small{display:block;color:var(--mut);font-size:8px;margin-bottom:3px}.opt>div{display:flex;flex-wrap:wrap;gap:4px}

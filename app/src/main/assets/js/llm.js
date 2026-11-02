@@ -10,7 +10,7 @@ let LD={busy:0,file:'',want:''}; // modelo en memoria
 let GEN=null;              // respuesta en curso
 let PEND=null;             // pedido que espera a que el modelo cargue
 let FILES=[];              // modelos en el teléfono [{file,size}|{file,part}]
-const fsz=b=>b>=1e9?(b/1e9).toFixed(1)+' GB':Math.max(1,Math.round(b/1e6))+' MB';
+const fsz=b=>b>=1e9?(b/1e9).toFixed(1)+' GB':b>=1e6?Math.round(b/1e6)+' MB':Math.max(1,Math.round(b/1e3))+' KB';
 /* velocidad aproximada en un teléfono de gama media-alta (tokens por segundo) */
 const MSX={q06:40,g1:26,l1:26,q17:20,qc15:20,l3:11,qc3:11,g4:8,q4i:9,q8:4};
 
@@ -61,7 +61,7 @@ function llmModel(k){const m=M.find(x=>x[0]==k);if(!m)return;const s=st.m[k];
   IgnisLLM.download(k,HF+m[7]+'/resolve/main/'+m[8]+'?download=true',m[8],m[9]||'',m[10]||0);R('models');return}
  if(s==1){for(const x in st.m)if(st.m[x]==2)st.m[x]=1;st.m[k]=2;BR.cfg.act=k;brSave();llmLoad(m);cambioModelo(k);R('models','chat','home');return}
  if(LD.file!=m[8])llmLoad(m);else T('Modelo activo y en memoria')}
-function llmLoad(m){if(LD.busy)return;LD.busy=1;LD.want=m[8];setMood('work');IgnisLLM.load(m[8],cp(m)=='justo'?2048:4096);if(cur()=='models')R('models')}
+function llmLoad(m){if(LD.busy)return;LD.busy=1;LD.want=m[8];setMood('work');IgnisLLM.load(m[8],+BR.cfg.ctx||(cp(m)=='justo'?2048:4096),+BR.cfg.thr||0);if(cur()=='models')R('models')}
 function mDel(k){const m=M.find(x=>x[0]==k);if(!m)return;
  if(st.mdel!=k){st.mdel=k;T('Toca otra vez para borrar '+m[1]+' del teléfono');setTimeout(()=>{if(st.mdel==k){st.mdel=0;R('models')}},3000);R('models');return}
  st.mdel=0;if(LD.file==m[8])LD.file='';IgnisLLM.delete(m[8]);if(BR.cfg.act==k)BR.cfg.act=null;llmSync();brSave();T('Borrado: '+m[1]);R('models','chat','home')}
@@ -105,9 +105,10 @@ function llmGen(r){
  // si el pedido modifica el diseño actual, el modelo recibe su HTML (sin el tema ni las ilustraciones)
  let uq=q;const cur0=BR.res&&(BR.res.raw||'');
  if(cur0&&isEdit(r.q)){const lim=cp(r.m)=='justo'?2500:6000;uq='Este es el HTML del diseño actual:\n```html\n'+cur0.slice(0,lim)+'\n```\nModifícalo así: '+q+'\nDevuelve la página completa actualizada.'}
- const msgs=[{r:'system',c:contexto()+'\n'+SYSP}].concat(hist,[{r:'user',c:uq}]);
+ const sk=skillPrompt();
+ const msgs=[{r:'system',c:contexto()+'\n'+SYSP+(sk?'\nAplica además estas skills:\n'+sk:'')}].concat(hist,[{r:'user',c:uq}]);
  GEN={raw:'',q:r.q,m:r.m};setMood('work');genPaint();
- try{IgnisLLM.generate(JSON.stringify({msgs,max:cp(r.m)=='justo'?1400:3000,temp:.7}))}catch(e){genDone('',0,0,'No se pudo iniciar el modelo')}}
+ try{IgnisLLM.generate(JSON.stringify({msgs,max:+BR.cfg.max||(cp(r.m)=='justo'?1400:3000),temp:BR.cfg.temp!=null?+BR.cfg.temp:.7}))}catch(e){genDone('',0,0,'No se pudo iniciar el modelo')}}
 /* texto visible: sin el razonamiento <think> */
 function vis(raw){let t=String(raw||'').replace(/<think>[\s\S]*?<\/think>/g,'');const i=t.indexOf('<think>');const th=i>=0;if(th)t=t.slice(0,i);return{t:t.trim(),th}}
 /* texto con **negrita**, saltos de línea y bloques de código */
@@ -157,7 +158,7 @@ function polish(h){h=String(h||'');let i=0;
   return `<img src="${phImg(alt,i++)}"${rest}>`});
  // fondos con imágenes externas (no cargan): degradado
  h=h.replace(/url\(\s*(['"]?)(https?:|\/\/)[^)]*\)/gi,'linear-gradient(135deg,#6d4aff,#ff6a9d)');
- const head='<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap">'+IGTHEME;
+ const tv=themeVars();const head='<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap">'+IGTHEME.replace('--a:#6d4aff;--a2:#ff6a9d','--a:'+tv[0]+';--a2:'+tv[1]);
  h=h.replace(/<meta[^>]*charset[^>]*>/i,'').replace(/<meta[^>]*name=["']viewport["'][^>]*>/i,'');
  if(/<head[^>]*>/i.test(h))return h.replace(/<head[^>]*>/i,x=>x+head);
  if(/<html[^>]*>/i.test(h))return h.replace(/<html[^>]*>/i,x=>x+'<head>'+head+'</head>');

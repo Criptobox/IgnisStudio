@@ -237,7 +237,7 @@ class LlmBridge(private val act: MainActivity, private val web: WebView) {
     // ---------- Cargar y generar ----------
 
     @JavascriptInterface
-    fun load(file: String, nCtx: Int) {
+    fun load(file: String, nCtx: Int, nThreads: Int) {
         val name = safeName(file) ?: return emit(ev("loaderr").put("msg", "Archivo no válido"))
         if (!LlamaNative.available) return emit(ev("loaderr").put("msg", "El motor local no está disponible en este teléfono"))
         val f = File(dir, name)
@@ -250,7 +250,7 @@ class LlmBridge(private val act: MainActivity, private val web: WebView) {
                 if (!initDone) { LlamaNative.init(act.applicationInfo.nativeLibraryDir); initDone = true }
                 val t0 = System.currentTimeMillis()
                 loadedFile = ""
-                val err = LlamaNative.load(f.absolutePath, nCtx.coerceIn(512, 16384), threads())
+                val err = LlamaNative.load(f.absolutePath, nCtx.coerceIn(512, 16384), if (nThreads > 0) nThreads.coerceAtMost(Runtime.getRuntime().availableProcessors()) else threads())
                 if (err.isEmpty()) {
                     loadedFile = name
                     emit(ev("loaded").put("file", name).put("desc", LlamaNative.describe()).put("ms", System.currentTimeMillis() - t0))
